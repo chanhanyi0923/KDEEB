@@ -93,6 +93,7 @@ void Application::InitOpenGL()
 
 void Application::Input(const char * inputFile)
 {
+
     using std::vector;
     using std::string;
     using std::fstream;
@@ -106,15 +107,16 @@ void Application::Input(const char * inputFile)
         throw RenderException("Could not open input file");
     }
 
-    // input >> this->dataSet;
+    input >> this->dataSet;
+/*
     const int frameSize = 100;
 
     frames.resize(frameSize);
     bitset<3000> state[frameSize], zero;
 
     size_t lineNum = 0;
-    for (string line; getline(input, line); ) {
-        stringstream lineBuffer(line);
+    for (string stringLine; getline(input, stringLine); ) {
+        stringstream lineBuffer(stringLine);
         string token;
 
         // split by ','
@@ -124,10 +126,12 @@ void Application::Input(const char * inputFile)
             stringstream buffer(token);
             buffer >> number[i];
         }
-        vector<Record> records;
-        records.push_back(Record(number[1], number[0], 1.0f));
-        records.push_back(Record(number[3], number[2], 1.0f));
-        this->dataSet.data.push_back(records);
+
+        Line line;
+        //vector<Record> records;
+        line.AddPoint(Point(number[1], number[0], 1.0f));
+        line.AddPoint(Point(number[3], number[2], 1.0f));
+        this->dataSet.lines.push_back(line);
 
         for (int i = 0; i < frameSize; i ++) {
             int in;
@@ -151,24 +155,8 @@ void Application::Input(const char * inputFile)
             }
         }
     }
-/*
-    for (int i = 0; i < 2; i ++) {
-        const Record & r = this->dataSet.data[i][0];
-        std::cout << r.x << " " << r.y << " " << r.z << std::endl;
-    }
-    for (int i = 0; i < 10; i ++) {
-        std::cout << "Add: " << std::endl;
-        for (int j = 0; j < this->frames[i].add.size() && j < 10; j ++) {
-            std::cout << (int)this->frames[i].add[j] << std::endl;
-        }
-
-        std::cout << "Remove: " << std::endl;
-        for (int j = 0; j < this->frames[i].remove.size() && j < 10; j ++) {
-            std::cout << (int)this->frames[i].remove[j] << std::endl;
-        }
-
-    }
 */
+
     //
     //
 
@@ -232,7 +220,7 @@ void Application::Run(const char * inputFile, const char * outputFile)
     this->Input(inputFile);
     //this->Input();
 
-    this->RealTimeBundle();
+    this->NonRealTimeBundle();
     this->Output(outputFile);
     //this->Output();
 
@@ -251,7 +239,7 @@ void Application::NonRealTimeBundle()
     }
 }
 
-
+/*
 void Application::RealTimeBundle()
 {
     this->InitBundle();
@@ -278,7 +266,7 @@ void Application::RealTimeBundle()
     }
     delete originalDataSet;
 }
-
+*/
 
 void Application::InitBundle()
 {
@@ -299,14 +287,19 @@ void Application::Bundle(const Iteration & iteration)
     Framebuffer framebuffer(iteration.textureWidth);
     framebuffer.Init();
 
+    //this->gradient.SetWidth(textureWidth);
     this->gradient.Resize(textureWidth * textureWidth);
+    this->gradient.SetWidth(textureWidth);
+    this->gradient.SetAttractionFactor(iteration.attractionFactor);
 
     for (int i = 0; i < iteration.count; i++) {
         Image image(dataSet, &this->shader);
         image.Init();
 
-        vector<float> accD = framebuffer.ComputeSplatting(iteration.kernelSize, this->dataSet, image);
-        this->gradient.ApplyGradient(this->dataSet, accD, textureWidth, iteration.attractionFactor, this->obstacleRadius);
+        std::vector<float> accD = framebuffer.ComputeSplatting(iteration.kernelSize, this->dataSet, image);
+        this->gradient.SetAccMap(&accD);
+        this->gradient.ApplyGradient(this->dataSet, this->obstacleRadius);
+
         this->dataSet.SmoothTrails(iteration.smoothingFactor);
         if (iteration.doResampling) {
             this->dataSet.AddRemovePoints(this->pointRemoveDistance, this->pointSplitDistant);

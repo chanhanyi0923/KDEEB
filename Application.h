@@ -21,11 +21,11 @@ class Application
     const double obstacleRadius = 0.0;
 	const float pointSplitDistant = 0.003f;
 	const float pointRemoveDistance = 0.003f;
-	vector<Iteration> iterationsForNonRealTime;
-	vector<Iteration> iterationsForRealTime;
+	std::vector<Iteration> iterationsForNonRealTime;
+	std::vector<Iteration> iterationsForRealTime;
 
     EGLDisplay eglDpy;
-	std::vector<Frame> frames;
+	// std::vector<Frame> frames;
 	DataSet dataSet;
 	Gradient gradient;
     Shader shader;

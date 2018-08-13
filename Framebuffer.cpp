@@ -39,7 +39,7 @@ void Framebuffer::Init()
 }
 
 
-vector<float> Framebuffer::ComputeSplatting(float kernelSize, const DataSet & dataSet, Image & image) const
+std::vector<float> Framebuffer::ComputeSplatting(float kernelSize, const DataSet & dataSet, Image & image) const
 {
 	image.SetPointSize(kernelSize);
 	image.SetPointStrength(this->pointStrength);
@@ -74,7 +74,7 @@ vector<float> Framebuffer::ComputeSplatting(float kernelSize, const DataSet & da
 
 	image.Render();
 
-	vector<float> accF;
+	std::vector<float> accF;
 	accF.resize(this->textureWidth * this->textureWidth, 0.0f);
 
 	// read pixels from framebuffer

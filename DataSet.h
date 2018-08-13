@@ -6,23 +6,19 @@
 #include <string>
 #include <sstream>
 
-#include "Record.h"
-
-using std::istream;
-using std::ostream;
-using std::vector;
+#include "Line.h"
 
 class DataSet
 {
 public:
-	vector< vector<Record> > data;
+	std::vector<Line> lines;
 
 	DataSet();
 	DataSet(size_t size);
-	virtual ~DataSet();
+	~DataSet();
 
-	friend istream & operator >> (istream & input, DataSet & dataSet);
-	friend ostream & operator << (ostream & output, const DataSet & dataSet);
+	friend std::istream & operator >> (std::istream & input, DataSet & dataSet);
+	friend std::ostream & operator << (std::ostream & output, const DataSet & dataSet);
 
 	void AddRemovePoints(double removeDist, double splitDist);
     void SmoothTrails(const double interp);

@@ -1,7 +1,10 @@
 #include "Gradient.h"
 
 
-Gradient::Gradient()
+Gradient::Gradient():
+    width(0),
+    accMapPtr(nullptr),
+    attractionFactor(0.0)
 {
 }
 
@@ -11,74 +14,107 @@ Gradient::~Gradient()
 }
 
 
-void Gradient::Resize(size_t size)
+void Gradient::Resize(const size_t size)
 {
-	this->gradientX.resize(size);
-	this->gradientY.resize(size);
+    this->x.resize(size);
+    this->y.resize(size);
 }
 
 
-void Gradient::ComputeGradient(const vector<float> & accMap, int gradientW, float attractionFactor)
+void Gradient::SetAttractionFactor(const double attractionFactor)
 {
-	#pragma omp parallel for
-	for (int y = 0; y < gradientW - 1; y++) {
-		const int curLineOffs = y * gradientW;
-
-		#pragma omp parallel for
-		for (int x = 0; x < gradientW - 1; x++) {
-			int index = x + curLineOffs;
-			float num2 = accMap[index];
-			float num3 = num2 - accMap[index + 1];
-			float num4 = num2 - accMap[index + gradientW];
-			glm::vec2 vec2d = glm::vec2(num3, num4);
-			if (glm::length(vec2d) > 5E-06f) {
-				vec2d = glm::normalize(vec2d);
-				this->gradientX[index] = vec2d.x * attractionFactor;
-				this->gradientY[index] = vec2d.y * attractionFactor;
-			}
-		}
-	}
+    this->attractionFactor = attractionFactor;
 }
 
 
-void Gradient::ApplyGradient(DataSet &dataSet, const vector<float> & accMap, int gradientW, double attractionFactor, double obstacleRadius)
+void Gradient::SetAccMap(const std::vector<float> * accMapPtr)
 {
-	this->ComputeGradient(accMap, gradientW, attractionFactor / 100.0f);
+    this->accMapPtr = accMapPtr;
+}
 
-	#pragma omp parallel for
-	for (int i = 0; i < dataSet.data.size(); i ++) {
-		vector<Record> & records = dataSet.data[i];
-        if (records.size() >= 2) {
-		Record & recordFront = records.front();
-		size_t idx = this->GetAccMapIndexNormalized(recordFront.x, recordFront.y, gradientW);
-		recordFront.z = accMap[idx];
-		for (int j = 1; j < records.size() - 1; j++) {
-			Record & record = records[j];
-			int index = this->GetAccMapIndexNormalized(record.x, record.y, gradientW);
-			float num3 = accMap[index];
-			double x = record.x - this->gradientX[index];
-			double y = record.y - this->gradientY[index];
-			if (x < 0.0 || x > 1.0 || y < 0.0 || y > 1.0) {
-				x = record.x;
-				y = record.y;
-			}
-			record.x = x;
-			record.y = y;
-			record.z = num3 + 0.02f;
-		}
 
-		Record & recordBack = records.back();
-		size_t idx2 = this->GetAccMapIndexNormalized(recordBack.x, recordBack.y, gradientW);
-		recordBack.z = accMap[idx2];
+void Gradient::SetWidth(const int width)
+{
+    this->width = width;
+}
+
+
+void Gradient::ComputeGradient()
+{
+    const std::vector<float> & accMap = *(this->accMapPtr);
+
+    #pragma omp parallel for
+    for (int y = 0; y < width - 1; y++) {
+        const int curLineOffs = y * width;
+
+        #pragma omp parallel for
+        for (int x = 0; x < width - 1; x++) {
+            int index = x + curLineOffs;
+            float num2 = accMap[index];
+            float num3 = num2 - accMap[index + 1];
+            float num4 = num2 - accMap[index + width];
+            glm::vec2 vec2d = glm::vec2(num3, num4);
+
+            // 5E-06f => eps
+            if (glm::length(vec2d) > 5E-06f) {
+                vec2d = glm::normalize(vec2d);
+                this->x[index] = vec2d.x * (this->attractionFactor / 100.0f);
+                this->y[index] = vec2d.y * (this->attractionFactor / 100.0f);
+            }
         }
-	}
+    }
 }
 
 
-int Gradient::GetAccMapIndexNormalized(double x, double y, int width)
+void Gradient::ApplyGradient(DataSet & dataSet, const double obstacleRadius)
 {
-	int num1 = x * (width - 1);
-	int num2 = y * (width - 1);
-	return num1 + num2 * width;
+    this->ComputeGradient();
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < dataSet.lines.size(); i ++) {
+        Line & line = dataSet.lines[i];
+        if (line.GetSize() >= 2) {
+            Point firstPoint = line.GetFirstPoint();
+            firstPoint.z = this->GetAccMapValue(firstPoint.x, firstPoint.y);
+            line.SetFirstPoint(firstPoint);
+
+            for (size_t j = 1; j < line.GetSize() - 1; j++) {
+                Point point = line.GetPoint(j);
+                const size_t index = this->GetAccMapIndexNormalized(point.x, point.y);
+                double xNew = point.x - this->x[index];
+                double yNew = point.y - this->y[index];
+                if (xNew < 0.0 || xNew > 1.0 || yNew < 0.0 || yNew > 1.0) {
+                    xNew = point.x;
+                    yNew = point.y;
+                }
+                point.x = xNew;
+                point.y = yNew;
+                point.z = (*(this->accMapPtr))[index] + 0.02f;
+                line.SetPoint(j, point);
+            }
+
+            Point lastPoint = line.GetLastPoint();
+            lastPoint.z = this->GetAccMapValue(lastPoint.x, lastPoint.y);
+            line.SetLastPoint(lastPoint);
+        }
+    }
 }
+
+
+float Gradient::GetAccMapValue(const double x, const double y) const
+{
+    const size_t xIndex = x * (this->width - 1);
+    const size_t yIndex = y * (this->width - 1);
+    const size_t index = xIndex + yIndex * this->width;
+    return (*(this->accMapPtr))[index];
+}
+
+
+size_t Gradient::GetAccMapIndexNormalized(double x, double y) const
+{
+    const size_t xIndex = x * (this->width - 1);
+    const size_t yIndex = y * (this->width - 1);
+    return xIndex + yIndex * this->width;
+}
+
 

@@ -8,7 +8,7 @@ DataSet::DataSet()
 
 DataSet::DataSet(size_t size)
 {
-	this->data.resize(size);
+	this->lines.resize(size);
 }
 
 
@@ -17,7 +17,7 @@ DataSet::~DataSet()
 }
 
 
-istream & operator >> (istream & input, DataSet & dataSet)
+std::istream & operator >> (std::istream & input, DataSet & dataSet)
 {
 	using std::string;
 	using std::istringstream;
@@ -31,7 +31,7 @@ istream & operator >> (istream & input, DataSet & dataSet)
 	}
 
 	// alloc memory
-	dataSet.data.resize(countLine);
+	dataSet.lines.resize(countLine);
 
 	// return to the beginning of input file.
 	input.clear();
@@ -39,9 +39,9 @@ istream & operator >> (istream & input, DataSet & dataSet)
 
 	// read each line
 	for (size_t lineNum = 0; lineNum < countLine; lineNum ++) {
-		string line;
-		getline(input, line);
-		istringstream lineBuffer(line);
+		string stringLine;
+		getline(input, stringLine);
+		istringstream lineBuffer(stringLine);
 		string token;
 
 		double number[4] = { 0.0, 0.0, 0.0, 0.0 };
@@ -51,22 +51,24 @@ istream & operator >> (istream & input, DataSet & dataSet)
 			istringstream buffer(token);
 			buffer >> number[i];
 		}
-		vector<Record> & records = dataSet.data[lineNum];
-		records.push_back(Record(number[1], number[0], 1.0f));
-		records.push_back(Record(number[3], number[2], 1.0f));
+
+		Line & line = dataSet.lines[lineNum];
+		line.AddPoint(Point(number[1], number[0], 1.0f));
+		line.AddPoint(Point(number[3], number[2], 1.0f));
 	}
 	return input;
 }
 
 
-ostream & operator << (ostream & output, const DataSet & dataSet)
+std::ostream & operator << (std::ostream & output, const DataSet & dataSet)
 {
 	output << std::setprecision(15);
-	for (size_t i = 0; i < dataSet.data.size(); i ++) {
-		const vector<Record> & records = dataSet.data[i];
-		for (const Record & record : records) {
-			output << record.x << "," << record.y << "," << (i + 1) << std::endl;
-		}
+	for (size_t i = 0; i < dataSet.lines.size(); i ++) {
+		const Line & lines = dataSet.lines[i];
+        for (size_t j = 0; j < lines.GetSize(); j ++) {
+            const Point & point = lines.GetPoint(j);
+            output << point.x << "," << point.y << "," << (i + 1) << std::endl;
+        }
 	}
 	output << std::resetiosflags(std::ios::showbase);
 
@@ -79,91 +81,111 @@ void DataSet::AddRemovePoints(double removeDist, double splitDist)
 	const double removeDist2 = removeDist * removeDist;
 	const double splitDist2 = splitDist * splitDist;
 
-    DataSet temp = DataSet(this->data.size());
+    //DataSet temp = DataSet(this->lines.size());
 
 	#pragma omp parallel for
-	for (size_t i = 0; i < this->data.size(); i ++) {
-		const vector<Record> & records = this->data[i];
-        if (records.size() >= 2) {
+	for (size_t i = 0; i < this->lines.size(); i ++) {
+		const Line & line = this->lines[i];
+        if (line.GetSize() >= 2) {
+            Line source;
 
-		    vector<Record> source;
-		    Record item = records.front();
-		    source.push_back(item);
+		    Point prevPoint = line.GetFirstPoint();
+		    source.AddPoint(prevPoint);
 
-		    for (size_t j = 1; j < records.size(); j ++) {
-			    const Record & record = records[j];
+		    for (size_t j = 1; j < line.GetSize(); j ++) {
+			    const Point & point = line.GetPoint(j);
 
-			    const double dist = (item.x - record.x) * (item.x - record.x) + (item.y - record.y) * (item.y - record.y);
+			    const double dist = (prevPoint.x - point.x) * (prevPoint.x - point.x) +
+                                    (prevPoint.y - point.y) * (prevPoint.y - point.y);
+
 			    if (dist > splitDist2) {
-				    source.push_back(Record(
-					    (item.x + record.x) / 2.0,
-					    (item.y + record.y) / 2.0,
-					    (item.z + record.z) / 2.0,
-					    record.timeNormelized,
-					    record.timeInt
+				    source.AddPoint(Point(
+					    (prevPoint.x + point.x) / 2.0,
+					    (prevPoint.y + point.y) / 2.0,
+					    (prevPoint.z + point.z) / 2.0,
+					    point.timeNormelized,
+					    point.timeInt
 				    ));
-				    source.push_back(record);
-				    item = record;
+				    source.AddPoint(point);
+                    prevPoint = point;
 			    } else if (dist > removeDist2) {
-				    source.push_back(record);
-				    item = record;
+				    source.AddPoint(point);
+				    prevPoint = point;
 			    }
 		    }
 
-		    if (records.back() != source.back()) {
-			    source.push_back(records.back());
-		    }
-		    const double timeInt = source.front().timeInt;
-	    	const double num5 = (source.back().timeInt - timeInt) / (double)(source.size() - 1);
-    		for (size_t k = 0; k < source.size(); k++) {
-			    Record record3 = source[k];
-			    record3.timeInt = timeInt + num5 * k;
+		    if (line.GetLastPoint() != source.GetLastPoint()) {
+			    source.AddPoint(line.GetLastPoint());
 		    }
 
-            temp.data[i] = source;
+
+		    const double firstTimeInt = source.GetFirstPoint().timeInt;
+		    const double lastTimeInt = source.GetLastPoint().timeInt;
+	    	const double timeLength = (lastTimeInt - firstTimeInt) / (source.GetSize() - 1);
+    		for (size_t k = 0; k < source.GetSize(); k++) {
+			    Point point = source.GetPoint(k);
+			    point.timeInt = firstTimeInt + timeLength * k;
+                source.SetPoint(k, point);
+		    }
+
+            this->lines[i] = source;
+            // temp.data[i] = source;
         }
 	}
-    this->data = temp.data;
+    //this->lines = temp.lines;
 }
 
 
 void DataSet::SmoothTrails(const double interp)
 {
+    using std::vector;
     using std::pair;
 
     #pragma omp parallel for
-    for (size_t i = 0; i < this->data.size(); i ++) {
-        vector<Record> & recordArray = this->data[i];
-        if (recordArray.size() >= 2) {
-            const size_t length = recordArray.size();
-            vector< pair<float, float> > vectorArray(length);
-            for (int index = 1; index < length - 1; index ++) {
-                vectorArray[index] = std::make_pair(recordArray[index].x, recordArray[index].y);
+    for (size_t _ = 0; _ < this->lines.size(); _ ++) {
+        Line & line = this->lines[_];
+        const size_t lineSize = line.GetSize();
+
+        if (lineSize >= 2) {
+            vector< pair<float, float> > smoothedPoints(lineSize);
+
+            for (size_t i = 1; i < lineSize - 1; i ++) {
+                const Point & point = line.GetPoint(i);
+                smoothedPoints[i] = std::make_pair(point.x, point.y);
             }
 
-            for (int j = 0; j < 10; j++) {
-                for (int index = 1; index < length - 1; index++) {
-                    double num4 = 0.0;
-                    double num5 = 0.0;
-                    int num6 = 0;
+            const size_t iterationCount = 10;
+            for (size_t count = 0; count < iterationCount; count ++) {
+                for (size_t i = 1; i < lineSize - 1; i ++) {
+
+                    double sumX = 0.0;
+                    double sumY = 0.0;
+                    size_t nearPointsSize = 0;
                     for (int k = -4; k <= 4; k++) {
-                        int num8 = index + k;
-                        if ((num8 >= 0) && (num8 < length)) {
-                            num4 += recordArray[num8].x;
-                            num5 += recordArray[num8].y;
-                            num6++;
+                        int index = i + k;
+
+                        // check if the index is legal
+                        if (index >= 0 && index < lineSize) {
+                            const Point & point = line.GetPoint(index);
+                            sumX += point.x;
+                            sumY += point.y;
+                            nearPointsSize ++;
                         }
                     }
-                    num4 /= (double)num6;
-                    num5 /= (double)num6;
-                    vectorArray[index].first = vectorArray[index].first * (1.0 - interp) + num4 * interp;
-                    vectorArray[index].second = vectorArray[index].second * (1.0 - interp) + num5 * interp;
+                    sumX /= nearPointsSize;
+                    sumY /= nearPointsSize;
+
+                    smoothedPoints[i].first = smoothedPoints[i].first * (1.0 - interp) + sumX * interp;
+                    smoothedPoints[i].second = smoothedPoints[i].second * (1.0 - interp) + sumY * interp;
                 }
-                for (int index = 1; index < length - 1; index++) {
-                    recordArray[index].x = vectorArray[index].first;
-                    recordArray[index].y = vectorArray[index].second;
+                for (size_t i = 1; i < lineSize - 1; i ++) {
+                    Point point = line.GetPoint(i);
+                    point.x = smoothedPoints[i].first;
+                    point.y = smoothedPoints[i].second;
+                    line.SetPoint(i, point);
                 }
             }
+
         }
     }
 }
