@@ -39,7 +39,7 @@ void Framebuffer::Init()
 }
 
 
-std::vector<float> Framebuffer::ComputeSplatting(float kernelSize, const DataSet & dataSet, Image & image) const
+std::vector<float> Framebuffer::ComputeSplatting(float kernelSize, Image & image) const
 {
 	image.SetPointSize(kernelSize);
 	image.SetPointStrength(this->pointStrength);
@@ -88,7 +88,7 @@ std::vector<float> Framebuffer::ComputeSplatting(float kernelSize, const DataSet
 	const float maxAccu = *std::max_element(accF.begin(), accF.end());
 	if (fabs(maxAccu) > eps) {
 		#pragma omp parallel for
-		for (int i = 0; i < accF.size(); i++) {
+		for (size_t i = 0; i < accF.size(); i++) {
 			accF[i] /= maxAccu;
 		}
 	}

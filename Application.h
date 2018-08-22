@@ -19,8 +19,8 @@
 class Application
 {
     const double obstacleRadius = 0.0;
-	const float pointSplitDistant = 0.003f;
-	const float pointRemoveDistance = 0.003f;
+	const float pointSplitDistant = 0.0001f;
+	const float pointRemoveDistance = 0.0001f;
 	std::vector<Iteration> iterationsForNonRealTime;
 	std::vector<Iteration> iterationsForRealTime;
 
@@ -29,24 +29,28 @@ class Application
 	DataSet dataSet;
 	Gradient gradient;
     Shader shader;
-public:
-	Application();
-	~Application();
+
+    // for morphing
+    std::vector<Point> refPoints;
+
+	void Input(const char * inputFile);
+	void Input();
+	void Output(const char * outputFile);
+	//void Output();
 
 	void TerminateOpenGL();
 	void InitOpenGL();
 	void Config();
-
-	void Input(const char * inputFile);
-	//void Input();
-	void Output(const char * outputFile);
-	//void Output();
-
-	void Run(const char * inputFile, const char * outputFile);
-
+    void NonRealTimeBundleWithWaypoint();
     void NonRealTimeBundle();
     void RealTimeBundle();
     void InitBundle();
 	void Bundle(const Iteration & iteration);
+    void BundleWithWaypoint(const Iteration & iteration);
+
+public:
+	Application();
+	~Application();
+	void Run(const char * inputFile, const char * outputFile);
 };
 

@@ -217,10 +217,11 @@ void Application::Run(const char * inputFile, const char * outputFile)
 
     this->Config();
 
-    this->Input(inputFile);
-    //this->Input();
+    //this->Input(inputFile);
+    this->Input();
 
-    this->NonRealTimeBundle();
+    this->NonRealTimeBundleWithWaypoint();
+    //this->NonRealTimeBundle();
     this->Output(outputFile);
     //this->Output();
 
@@ -228,6 +229,154 @@ void Application::Run(const char * inputFile, const char * outputFile)
 
     end = clock();
     std::cout<< "whole total time: " << (double)(end-start)/CLOCKS_PER_SEC << std::endl;
+}
+
+
+void Application::NonRealTimeBundleWithWaypoint()
+{
+    using std::fstream;
+    using std::string;
+    using std::stringstream;
+
+    this->InitBundle();
+
+    for (int fileNum = 1; fileNum <= 35; fileNum ++) {
+
+
+/*
+        // load waypoints
+        char filename[100];
+        // others/Morphing/data/waypoints_1.txt
+        sprintf(filename, "others/Morphing/data/13/waypoints_%d.txt", fileNum);
+
+        fstream fin;
+        fin.open(filename, fstream::in);
+        for (string stringLine; getline(fin, stringLine); ) {
+            stringstream buffer1(stringLine);
+            int lineIndex, oIndex, dIndex, waypointIndex;
+            string mincut;
+            buffer1 >> lineIndex >> oIndex >> dIndex >> mincut;
+
+            lineIndex --;
+            oIndex --;
+            dIndex --;
+
+            Line & line = this->dataSet.lines[lineIndex];
+
+            stringstream buffer2(mincut);
+            for (string w; getline(buffer2, w, ','); ) {
+                stringstream buffer3(w);
+                buffer3 >> waypointIndex;
+                waypointIndex --;
+
+                const Point p = this->refPoints[waypointIndex];
+
+                const size_t oId = line.FindPointIndex(this->refPoints[oIndex]);
+                const size_t dId = line.FindPointIndex(this->refPoints[dIndex]);
+                line.AddWaypoint(oId, dId, Waypoint(p.x, p.y));
+            }
+        }
+        fin.close();
+
+
+        // load routes
+        sprintf(filename, "others/Morphing/data/13/routes_%d.txt", fileNum);
+
+        fin.open(filename, fstream::in);
+        for (string stringLine; getline(fin, stringLine); ) {
+            stringstream buffer1(stringLine);
+            int lineIndex, oIndex, dIndex;
+            buffer1 >> lineIndex >> oIndex >> dIndex;
+
+            lineIndex --;
+            oIndex --;
+            dIndex --;
+
+            Line & line = this->dataSet.lines[lineIndex];
+            const size_t oId = line.FindPointIndex(this->refPoints[oIndex]);
+            const size_t dId = line.FindPointIndex(this->refPoints[dIndex]);
+            line.AddSegment(oId, dId);
+        }
+        fin.close();
+*/
+
+        // test 2
+        // load waypoints
+        char filename[100];
+        // others/Morphing/data/waypoints_1.txt
+        sprintf(filename, "others/out/waypoints_%d.txt", fileNum);
+
+        fstream fin;
+        fin.open(filename, fstream::in);
+        for (string stringLine; getline(fin, stringLine); ) {
+            stringstream buffer1(stringLine);
+            int lineIndex;
+            double ox, oy, dx, dy;
+            string mincut;
+            buffer1 >> lineIndex >> ox >> oy >> dx >> dy;
+
+            lineIndex --;
+
+            Line & line = this->dataSet.lines[lineIndex];
+
+            const size_t oId = line.FindPointIndex(Point(ox, oy, 0));
+            const size_t dId = line.FindPointIndex(Point(dx, dy, 0));
+
+            for (string w; getline(buffer1, w, ','); ) {
+                stringstream buffer3(w);
+                double waypointX, waypointY;
+                buffer3 >> waypointX >> waypointY;
+
+                line.AddWaypoint(oId, dId, Waypoint(waypointX, waypointY));
+            }
+        }
+        fin.close();
+
+
+        // load routes
+        sprintf(filename, "others/out/routes_%d.txt", fileNum - 1);
+
+        fin.open(filename, fstream::in);
+        for (string stringLine; getline(fin, stringLine); ) {
+            stringstream buffer1(stringLine);
+            int lineIndex;
+            double ox, oy, dx, dy;
+            buffer1 >> lineIndex >> ox >> oy >> dx >> dy;
+            lineIndex --;
+
+            Line & line = this->dataSet.lines[lineIndex];
+
+            const size_t oId = line.FindPointIndex(Point(ox, oy, 0));
+            const size_t dId = line.FindPointIndex(Point(dx, dy, 0));
+
+            line.AddSegment(oId, dId);
+        }
+        fin.close();
+
+
+        // bundle
+        //#pragma omp parallel for
+        for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
+            Line & line = this->dataSet.lines[i];
+
+            if (line.GetWaypointSize() == 0) {
+                line = Line();
+            }
+            // std::cout << "Line " << i << std::endl;
+            line.UpdatePoints();
+        }
+
+
+        // Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling))
+        this->BundleWithWaypoint(Iteration(20, 200, 20, 0.1, 0.1, true));
+
+        //#pragma omp parallel for
+        for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
+            Line & line = this->dataSet.lines[i];
+            line.ClearWaypoints();
+        }
+
+    }
 }
 
 
@@ -287,7 +436,6 @@ void Application::Bundle(const Iteration & iteration)
     Framebuffer framebuffer(iteration.textureWidth);
     framebuffer.Init();
 
-    //this->gradient.SetWidth(textureWidth);
     this->gradient.Resize(textureWidth * textureWidth);
     this->gradient.SetWidth(textureWidth);
     this->gradient.SetAttractionFactor(iteration.attractionFactor);
@@ -296,15 +444,53 @@ void Application::Bundle(const Iteration & iteration)
         Image image(dataSet, &this->shader);
         image.Init();
 
-        std::vector<float> accD = framebuffer.ComputeSplatting(iteration.kernelSize, this->dataSet, image);
+        std::vector<float> accD = framebuffer.ComputeSplatting(iteration.kernelSize, image);
         this->gradient.SetAccMap(&accD);
-        this->gradient.ApplyGradient(this->dataSet, this->obstacleRadius);
+        this->gradient.ApplyGradient(this->dataSet);
 
         this->dataSet.SmoothTrails(iteration.smoothingFactor);
         if (iteration.doResampling) {
             this->dataSet.AddRemovePoints(this->pointRemoveDistance, this->pointSplitDistant);
         }
     }
+}
+
+
+void Application::BundleWithWaypoint(const Iteration & iteration)
+{
+    const uint32_t textureWidth = iteration.textureWidth;
+
+    Framebuffer framebuffer(iteration.textureWidth);
+    framebuffer.Init();
+
+    this->gradient.Resize(textureWidth * textureWidth);
+    this->gradient.SetWidth(textureWidth);
+    this->gradient.SetAttractionFactor(iteration.attractionFactor);
+    this->gradient.InitSteps(iteration.count);
+
+    for (int i = 0; i < iteration.count; i++) {
+        Image image(dataSet, &this->shader);
+        image.Init();
+        std::vector<float> accD = framebuffer.ComputeSplatting(iteration.kernelSize, image);
+        this->gradient.SetAccMap(&accD);
+        this->gradient.ApplyGradientWithWaypoint(this->dataSet, i);
+        this->dataSet.SmoothTrailsWithWaypoint(iteration.smoothingFactor);
+        if (iteration.doResampling) {
+            this->dataSet.AddRemovePointsWithWaypoint(this->pointRemoveDistance, this->pointSplitDistant);
+        }
+
+        if (i == iteration.count - 1) {
+            this->dataSet.RemovePointsInSegment();
+        }
+        //
+        static int c = 0;
+        char s[100];
+        sprintf(s, "others/test_out/%d.txt", c);
+        this->Output(s);
+        c ++;
+        //
+    }
+
 }
 
 

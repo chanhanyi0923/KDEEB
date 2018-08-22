@@ -1,0 +1,18 @@
+#include "Waypoint.h"
+
+Waypoint::Waypoint(double x, double y):
+    x(x),
+    y(y),
+    closestPointId(-1),
+    oId(-1),
+    dId(-1),
+    minDist(0.0)
+{
+}
+
+
+Waypoint::~Waypoint()
+{
+}
+
+

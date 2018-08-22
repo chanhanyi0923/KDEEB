@@ -9,7 +9,7 @@ Image::Image(const DataSet & dataSet, Shader * shaderPtr):
     shaderPtr(shaderPtr)
 {
     for (const Line & line : dataSet.lines) {
-        for (size_t j = 0; j < line.GetSize(); j ++) {
+        for (size_t j = 0; j < line.GetPointSize(); j ++) {
             const Point & point = line.GetPoint(j);
             vertices.push_back(point.x * 2.0 - 1.0);
             vertices.push_back(point.y * 2.0 - 1.0);

@@ -1,5 +1,7 @@
 # Declaration of variables
-CC = g++ -std=c++11 -O3 -fopenmp
+
+#CC = g++ -std=c++11 -O3 -fopenmp -Wall -Wextra -Wno-reorder
+CC = g++ -std=c++11 -g -Wall -Wextra -Wno-reorder
 CC_FLAGS = -L/usr/lib/nvidia-396 -lOpenGL -lEGL
 
 # File names

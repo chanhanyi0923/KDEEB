@@ -10,6 +10,8 @@
 
 class DataSet
 {
+    void SmoothShifting(const Line & line, std::vector< std::pair<float, float> > & smoothedPoints, size_t index, size_t indexLowerBound, size_t indexUpperBound, const double interp);
+
 public:
 	std::vector<Line> lines;
 
@@ -22,5 +24,9 @@ public:
 
 	void AddRemovePoints(double removeDist, double splitDist);
     void SmoothTrails(const double interp);
+
+    void AddRemovePointsWithWaypoint(double removeDist, double splitDist);
+    void SmoothTrailsWithWaypoint(const double interp);
+    void RemovePointsInSegment();
 };
 

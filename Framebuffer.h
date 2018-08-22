@@ -20,6 +20,6 @@ public:
 
 	void Init();
 
-	std::vector<float> ComputeSplatting(float kernelSize, const DataSet & dataSet, Image & image) const;
+	std::vector<float> ComputeSplatting(float kernelSize, Image & image) const;
 };
 
