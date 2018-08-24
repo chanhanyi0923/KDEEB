@@ -5,19 +5,28 @@
 
 
 Point::Point() :
-	x(0.0), y(0.0), z(0.0), timeInt(0.0), timeNormelized(0.0), waypointId(-1), fixed(false), isSegment(false)
+	x(0.0), y(0.0), z(0.0), timeInt(0.0), timeNormelized(0.0),
+    waypointId(-1), fixed(false), isSegment(false),
+    prevFixedPointId(-1),
+    nextFixedPointId(-1)
 {
 }
 
 
 Point::Point(double x, double y, double z):
-	x(x), y(y), z(z), timeInt(0.0), timeNormelized(0.0), waypointId(-1), fixed(false), isSegment(false)
+	x(x), y(y), z(z), timeInt(0.0), timeNormelized(0.0),
+    waypointId(-1), fixed(false), isSegment(false),
+    prevFixedPointId(-1),
+    nextFixedPointId(-1)
 {
 }
 
 
 Point::Point(double x, double y, double z, double timeNormelized, double timeInt):
-	x(x), y(y), z(z), timeInt(timeInt), timeNormelized(timeNormelized), waypointId(-1), fixed(false), isSegment(false)
+	x(x), y(y), z(z), timeInt(timeInt), timeNormelized(timeNormelized),
+    waypointId(-1), fixed(false), isSegment(false),
+    prevFixedPointId(-1),
+    nextFixedPointId(-1)
 {
 }
 

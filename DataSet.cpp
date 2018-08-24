@@ -149,7 +149,7 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
 
             for (size_t j = 1; j < line.GetPointSize(); j ++) {
                 const Point & point = line.GetPoint(j);
-                Waypoint waypoint = line.GetWaypointFromPoint(j);
+                Waypoint waypoint = line.GetWaypointFromPointId(j);
 
                 const double dist = (prevPoint.x - point.x) * (prevPoint.x - point.x) +
                                     (prevPoint.y - point.y) * (prevPoint.y - point.y);
@@ -294,7 +294,7 @@ void DataSet::SmoothTrailsWithWaypoint(const double interp)
                         continue;
                     }
 
-                    const Waypoint & waypoint = line.GetWaypointFromPoint(i);
+                    const Waypoint & waypoint = line.GetWaypointFromPointId(i);
 
                     const size_t closestPointId = waypoint.closestPointId;
 

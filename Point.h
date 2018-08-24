@@ -1,10 +1,19 @@
 #pragma once
 
 #include <cstddef>
+#include <utility>
 
 class Point
 {
 public:
+    // previous fixed point id
+    // ( = -1 if the point itself is fixed of is others' closest point)
+    size_t prevFixedPointId;
+
+    // next fixed point id
+    // ( = -1 if the point itself is fixed of is others' closest point)
+    size_t nextFixedPointId;
+
     // if the point in a segment
     bool isSegment;
 

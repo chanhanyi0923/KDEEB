@@ -304,7 +304,9 @@ void Application::NonRealTimeBundleWithWaypoint()
         // load waypoints
         char filename[100];
         // others/Morphing/data/waypoints_1.txt
-        sprintf(filename, "others/out/waypoints_%d.txt", fileNum);
+        //sprintf(filename, "others/test2lines/waypoints_%d.txt", fileNum);
+        sprintf(filename, "others/1group/waypoints_%d.txt", fileNum);
+
 
         fstream fin;
         fin.open(filename, fstream::in);
@@ -334,7 +336,8 @@ void Application::NonRealTimeBundleWithWaypoint()
 
 
         // load routes
-        sprintf(filename, "others/out/routes_%d.txt", fileNum - 1);
+        //sprintf(filename, "others/test2lines/routes_%d.txt", fileNum - 1);
+        sprintf(filename, "others/1group/routes_%d.txt", fileNum - 1);
 
         fin.open(filename, fstream::in);
         for (string stringLine; getline(fin, stringLine); ) {
@@ -456,6 +459,9 @@ void Application::Bundle(const Iteration & iteration)
 }
 
 
+// just for test
+// extern int num;
+
 void Application::BundleWithWaypoint(const Iteration & iteration)
 {
     const uint32_t textureWidth = iteration.textureWidth;
@@ -487,6 +493,7 @@ void Application::BundleWithWaypoint(const Iteration & iteration)
         char s[100];
         sprintf(s, "others/test_out/%d.txt", c);
         this->Output(s);
+        //num = c;
         c ++;
         //
     }

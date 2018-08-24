@@ -1,9 +1,9 @@
 #pragma once
 
 #include <vector>
-#include <glm/glm.hpp>
 #include "DataSet.h"
 #include "Steps.h"
+#include <glm/glm.hpp>
 
 class Gradient
 {
@@ -21,6 +21,8 @@ private:
     size_t GetAccMapIndexNormalized(const double x, const double y) const;
     float GetAccMapValue(const double x, const double y) const;
     void ComputeGradient();
+    glm::dvec2 GetGradient(const Point & point);
+    glm::dvec2 GetForwordDirection(glm::dvec2 prevPoint, glm::dvec2 nextPoint, glm::dvec2 point);
 
 public:
     Gradient();

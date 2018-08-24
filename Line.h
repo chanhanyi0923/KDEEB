@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <vector>
+#include <algorithm>
 #include <map>
 #include "Point.h"
 #include "Waypoint.h"
@@ -41,7 +42,8 @@ public:
     void AddWaypoint(const size_t oId, const size_t dId, Waypoint waypoint);
     void AddWaypoints(const Line & line);
     void UpdatePoints();
-    Waypoint GetWaypointFromPoint(const size_t index) const;
+    Waypoint GetWaypointFromPointId(const size_t index) const;
+    Waypoint GetWaypoint(const size_t index) const;
     void SetWaypoint(const size_t index, const Waypoint & waypoint);
     size_t GetWaypointSize() const;
     void ClearWaypoints();

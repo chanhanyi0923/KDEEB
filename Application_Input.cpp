@@ -7,8 +7,8 @@ void Application::Input()
     using std::string;
     using std::stringstream;
 
-    //const char * file2 = "others/out/trip.txt";
-    const char * file2 = "others/out/trip.txt";
+    const char * file2 = "others/1group/trip.txt";
+    //const char * file2 = "others/test2lines/trip.txt";
     fstream lineIn;
     lineIn.open(file2, fstream::in);
     for (string stringLine; getline(lineIn, stringLine); ) {

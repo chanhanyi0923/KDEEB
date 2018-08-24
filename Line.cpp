@@ -64,9 +64,15 @@ void Line::AddPoint(const Point & point)
 }
 
 
-Waypoint Line::GetWaypointFromPoint(const size_t index) const
+Waypoint Line::GetWaypointFromPointId(const size_t index) const
 {
     return this->waypoints[this->points[index].waypointId];
+}
+
+
+Waypoint Line::GetWaypoint(const size_t index) const
+{
+    return this->waypoints[index];
 }
 
 
@@ -208,6 +214,8 @@ void Line::UpdatePoints()
         bool hasWaypoint = false;
         if (!point.fixed) {
             auto intervalPtr = this->intervals.end();
+
+            // can be acclerate begin
             for (auto it = this->intervals.begin(); it != this->intervals.end(); it ++) {
                 const size_t oId = it->first.first;
                 const size_t dId = it->first.second;
@@ -220,16 +228,23 @@ void Line::UpdatePoints()
                     break;
                 }
             }
+            // end
 
             if (hasWaypoint) {
                 const auto & ids = intervalPtr->second.waypointIds;
                 size_t closestWaypointId = -1;
                 int minIndexDist = std::numeric_limits<int>::max();
+
+                std::vector<size_t> fixedPointIds;
+                fixedPointIds.push_back(intervalPtr->first.first);
+
                 for (size_t id : ids) {
                     const Waypoint & waypoint = this->waypoints[id];
                     if (waypoint.closestPointId == (size_t)-1) {
                         continue;
                     }
+
+                    fixedPointIds.push_back(waypoint.closestPointId);
 
                     // distance(index) between this waypoint and point[i]
                     const int indexDist = std::abs((int)waypoint.closestPointId - (int)i);
@@ -240,10 +255,22 @@ void Line::UpdatePoints()
                     }
                 }
 
+                fixedPointIds.push_back(intervalPtr->first.second);
+
                 if (closestWaypointId == (size_t)-1) {
                     throw "could not find closest waypoint";
                 }
                 point.waypointId = closestWaypointId;
+
+                const auto closestFixedPointPtr = std::find(fixedPointIds.begin(), fixedPointIds.end(), this->waypoints[closestWaypointId].closestPointId);
+                //const auto closestFixedPointPtr = fixedPointIds.find(this->waypoints[closestWaypointId].closestPointId);
+                if (i < *closestFixedPointPtr) {
+                    point.prevFixedPointId = *std::prev(closestFixedPointPtr);
+                    point.nextFixedPointId = *closestFixedPointPtr;
+                } else if (i > *closestFixedPointPtr) {
+                    point.prevFixedPointId = *closestFixedPointPtr;
+                    point.nextFixedPointId = *std::next(closestFixedPointPtr);
+                }
             }
         }
         if (!hasWaypoint) {
