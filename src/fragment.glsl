@@ -1,3 +1,4 @@
+R"(
 #version 320 es
 
 uniform mediump float uPointStrength;
@@ -12,3 +13,5 @@ void main()
     mediump float result = max(0.0, 1.0 - disSquare * disSquare);
     fragColor = vec4(uPointStrength * result, 0.0, 0.0, 1.0);
 }
+
+)"

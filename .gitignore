@@ -1,5 +1,3 @@
 others/*
-main
-*.o
-*.csv
-*.bmp
+build/*
+!build/cmake/*

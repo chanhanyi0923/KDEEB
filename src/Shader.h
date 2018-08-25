@@ -11,13 +11,12 @@ class Shader
 private:
 	GLuint program, vertex_shader, fragment_shader;
 	bool vs, fs;
-	std::string OpenFile(const char *filename);
 
 public:
 	Shader();
-	virtual ~Shader();
-	void LoadVertexShader(const char *filename);
-	void LoadFragmentShader(const char *filename);
+	~Shader();
+	void LoadVertexShader();
+	void LoadFragmentShader();
 	void CreateProgram();
 	void Use();
 	GLuint Get();

@@ -16,37 +16,11 @@ Shader::~Shader()
 }
 
 
-std::string Shader::OpenFile(const char *filename)
+void Shader::LoadVertexShader()
 {
-	std::ifstream input;
-	input.exceptions(std::ifstream::badbit);
-
-	try {
-		input.open(filename, std::ifstream::in | std::ifstream::binary);
-		if (!input) {
-			throw std::system_error{ errno, std::generic_category() };
-		}
-
-		std::string result((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
-		return result;
-	}
-	catch (std::system_error const & e) {
-		std::stringstream buffer;
-		buffer << "Input: " << e.code() << " - " << e.what() << std::endl;
-		throw RenderException(buffer.str().c_str());
-	}
-	catch (RenderException const & e) {
-		std::stringstream buffer;
-		buffer << "Input: " << e.what() << std::endl;
-		throw RenderException(buffer.str().c_str());
-	}
-}
-
-
-void Shader::LoadVertexShader(const char * filename)
-{
-	std::string text = this->OpenFile(filename);
-	const GLchar *shader_code = text.c_str();
+    const GLchar *shader_code =
+    #include "vertex.glsl"
+    ;
 
 	GLint success;
 
@@ -67,10 +41,11 @@ void Shader::LoadVertexShader(const char * filename)
 }
 
 
-void Shader::LoadFragmentShader(const char * filename)
+void Shader::LoadFragmentShader()
 {
-	std::string text = this->OpenFile(filename);
-	const GLchar *shader_code = text.c_str();
+	const GLchar *shader_code =
+    #include "fragment.glsl"
+    ;
 
 	GLint success;
 

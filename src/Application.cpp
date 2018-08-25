@@ -215,7 +215,7 @@ void Application::Run(const char * inputFile, const char * outputFile)
 
     this->InitOpenGL();
 
-    this->Config();
+    //this->Config();
 
     //this->Input(inputFile);
     this->Input();
@@ -305,7 +305,7 @@ void Application::NonRealTimeBundleWithWaypoint()
         char filename[100];
         // others/Morphing/data/waypoints_1.txt
         //sprintf(filename, "others/test2lines/waypoints_%d.txt", fileNum);
-        sprintf(filename, "others/1group/waypoints_%d.txt", fileNum);
+        sprintf(filename, "%swaypoints_%d.txt", this->inputPath, fileNum);
 
 
         fstream fin;
@@ -337,7 +337,7 @@ void Application::NonRealTimeBundleWithWaypoint()
 
         // load routes
         //sprintf(filename, "others/test2lines/routes_%d.txt", fileNum - 1);
-        sprintf(filename, "others/1group/routes_%d.txt", fileNum - 1);
+        sprintf(filename, "%sroutes_%d.txt", this->inputPath, fileNum - 1);
 
         fin.open(filename, fstream::in);
         for (string stringLine; getline(fin, stringLine); ) {
@@ -423,8 +423,8 @@ void Application::RealTimeBundle()
 void Application::InitBundle()
 {
     // initial shader
-    this->shader.LoadFragmentShader("shader.frag");
-    this->shader.LoadVertexShader("shader.vs");
+    this->shader.LoadFragmentShader();
+    this->shader.LoadVertexShader();
     this->shader.CreateProgram();
 }
 
@@ -491,7 +491,7 @@ void Application::BundleWithWaypoint(const Iteration & iteration)
         //
         static int c = 0;
         char s[100];
-        sprintf(s, "others/test_out/%d.txt", c);
+        sprintf(s, "./out/%d.txt", c);
         this->Output(s);
         //num = c;
         c ++;
