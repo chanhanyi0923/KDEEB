@@ -30,12 +30,12 @@ Steps::Steps(const size_t size):
 }
 
 
-double Steps::GetAdd(const size_t index, const double curDis) const
+double Steps::GetAdd(const size_t index) const
 {
     const double sum = this->data[index].first;
     const double add = this->data[index].second;
 
-    return add * curDis / (1.0 - sum);
+    return add / (1.0 - sum);
 }
 
 

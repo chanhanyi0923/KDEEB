@@ -21,11 +21,11 @@ class Application
 private:
 
     // temp
-    const char * inputPath = "/home/hanyi/KDEEB/others/1group/";
+    const char * inputPath = "/home/hanyi/KDEEB/others/test5/";
 
     //const double obstacleRadius = 0.0;
-	const float pointSplitDistant = 0.0001f;
-	const float pointRemoveDistance = 0.0001f;
+	const float pointSplitDistant = 0.0006f;
+	const float pointRemoveDistance = 0.0006f;
 	std::vector<Iteration> iterationsForNonRealTime;
 	std::vector<Iteration> iterationsForRealTime;
 

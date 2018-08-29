@@ -16,6 +16,20 @@ Line::~Line()
 }
 
 
+//debug
+bool Line::checkPoints()
+{
+    for (size_t i = 0; i < this->points.size(); i ++) {
+        const Point & point = this->points[i];
+        if (point.x < 0.1 || point.y < 0.1) {
+            std::cout << i << " " << point.x << " " << point.y << std::endl;
+            return false;
+        }
+    }
+    return true;
+}
+
+
 size_t Line::GetPointSize() const
 {
     return this->points.size();
@@ -24,6 +38,9 @@ size_t Line::GetPointSize() const
 
 Point Line::GetPoint(const size_t index) const
 {
+    if (index >= this->points.size()) {
+        throw "out of index";
+    }
     return this->points[index];
 }
 
@@ -60,6 +77,11 @@ void Line::SetPoint(const size_t index, const Point & point)
 
 void Line::AddPoint(const Point & point)
 {
+/*
+    if (point.x < 0.1 || point.y < 0.1) {
+        std::cout << "!!!" << std::endl;
+    }
+*/
     this->points.push_back(point);
 }
 
@@ -86,14 +108,16 @@ void Line::ClearWaypoints()
 {
     this->waypoints.clear();
     this->intervals.clear();
+    this->segments.clear();
 }
 
 
-size_t Line::FindPointIndex(const Point & point) const
+size_t Line::FindPointIndexById(const size_t id) const
 {
     size_t index = -1;
     for (size_t i = 0; i < this->GetPointSize(); i ++) {
-        if (point.Compare2D(this->GetPoint(i))) {
+        const Point & point = this->GetPoint(i);
+        if (id != (size_t)-1 && point.id != (size_t)-1 && point.id == id) {
             index = i;
             break;
         }
@@ -101,13 +125,19 @@ size_t Line::FindPointIndex(const Point & point) const
 
     if (index == (size_t)-1) {
 
-        int fixedNum = 0;
+/*
+        //int fixedNum = 0;
         for (size_t i = 0; i < this->GetPointSize(); i ++) {
             if (this->GetPoint(i).fixed) {
-                fixedNum ++;
+                std::cout << this->GetPoint(i).id << std::endl;
+//                fixedNum ++;
             }
         }
-        std::cout << fixedNum << std::endl;
+        std::cout << std::endl << id << std::endl;
+        std::cout << "line id: " << this->id << std::endl;
+        //std::cout << fixedNum << std::endl;
+*/
+        std::cout << "line id: " << this->id << std::endl;
 
         throw "index = -1";
     }
@@ -116,6 +146,7 @@ size_t Line::FindPointIndex(const Point & point) const
 }
 
 
+/*
 void Line::AddSegment(const size_t oId, const size_t dId)
 {
     if (dId < oId) {
@@ -134,6 +165,20 @@ void Line::AddSegment(const size_t oId, const size_t dId)
     for (size_t i = oId; i <= dId; i ++) {
         this->points[i].isSegment = true;
     }
+}
+*/
+
+// these are id of point in database, not id in this line
+void Line::AddSegment(const size_t oId, const size_t dId)
+{
+    using std::pair;
+
+    pair<size_t, size_t> pii = std::make_pair(oId, dId);
+    if (pii.first > pii.second) {
+        std::swap(pii.first, pii.second);
+    }
+
+    this->segments.insert(pii);
 }
 
 
@@ -200,8 +245,8 @@ void Line::AddWaypoints(const Line & line)
         const Point & d = line.GetPoint(waypoint.dId);
 
         // this is the real index in current line
-        const size_t oId = this->FindPointIndex(o);
-        const size_t dId = this->FindPointIndex(d);
+        const size_t oId = this->FindPointIndexById(o.id);
+        const size_t dId = this->FindPointIndexById(d.id);
         this->AddWaypoint(oId, dId, waypoint);
     }
 }
@@ -224,7 +269,8 @@ void Line::UpdatePoints()
                     intervalPtr = it;
                     break;
                 } else if (oId == i || dId == i) {
-                    point.fixed = true;
+                    if (!point.fixed) throw "Line:245";
+                    //point.fixed = true;
                     break;
                 }
             }
@@ -271,9 +317,44 @@ void Line::UpdatePoints()
                     point.prevFixedPointId = *closestFixedPointPtr;
                     point.nextFixedPointId = *std::next(closestFixedPointPtr);
                 }
+            } else {
+                //if (!point.isSegment) throw "Line.cpp:293; error";
+
+
+                int l = std::numeric_limits<int>::min();
+                int r = std::numeric_limits<int>::max();
+
+                for (auto it = this->intervals.begin(); it != this->intervals.end(); it ++) {
+                    const size_t oId = it->first.first;
+                    const size_t dId = it->first.second;
+                    if (dId < i) {
+                        l = std::max(l, (int)dId);
+                    }
+                    if (oId > i) {
+                        r = std::min(r, (int)oId);
+                    }
+                }
+
+                if (l == std::numeric_limits<int>::min()) {
+                    l = 0;
+                }
+                if (r == std::numeric_limits<int>::max()) {
+                    r = this->points.size();
+                }
+
+                point.prevFixedPointId = l;
+                point.nextFixedPointId = r;
             }
         }
         if (!hasWaypoint) {
+            if (!point.fixed/* && !point.isSegment*/) {
+
+
+                
+
+                std::cout << "error" << std::endl;
+                throw "! error";
+            }
             point.waypointId = -1;
         }
     }
@@ -314,12 +395,37 @@ void Line::RemovePointsInSegment()
         }
     }
 */
+
+/*
     for (size_t i = 0; i < this->points.size(); i ++) {
         const Point & point = this->points[i];
         if (!point.isSegment || point.fixed) {
             newPoints.push_back(point);
         }
     }
+*/
+    std::vector<bool> keep;
+    keep.resize(this->points.size(), true);
+
+    for (const auto & pii : this->segments) {
+        size_t oId = this->FindPointIndexById(pii.first);
+        size_t dId = this->FindPointIndexById(pii.second);
+        if (oId > dId) {
+            std::swap(oId, dId);
+        }
+        this->points[oId].isSegment = true;
+        this->points[dId].isSegment = true;
+        for (size_t i = oId + 1; i <= dId - 1; i ++) {
+            keep[i] = false;
+        }
+    }
+
+    for (size_t i = 0; i < this->points.size(); i ++) {
+        if (keep[i]) {
+            newPoints.push_back(this->points[i]);
+        }
+    }
+
     this->points = newPoints;
 }
 

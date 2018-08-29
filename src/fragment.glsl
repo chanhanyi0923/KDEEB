@@ -1,4 +1,5 @@
 R"(
+
 #version 320 es
 
 uniform mediump float uPointStrength;

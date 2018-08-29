@@ -130,14 +130,32 @@ glm::dvec2 Gradient::GetForwordDirection(glm::dvec2 prevPoint, glm::dvec2 nextPo
     // the direction point move forward
     dvec2 moveDirection = dvec2(prevPoint.y - nextPoint.y, nextPoint.x - prevPoint.x);
 
-    if (glm::dot(moveDirection, prevPoint - point) < 0) {
+/*
+    if ( moveDirection.x * (prevPoint.x - point.x) + moveDirection.y * (prevPoint.y - point.y) < 0) {
         moveDirection *= -1;
     }
-
+*/
     double triangleArea = glm::determinant(glm::dmat2(nextPoint - point, prevPoint - point)) / 2.0;
     double moveLength = triangleArea / glm::length(moveDirection);
 
     dvec2 result = moveLength * glm::normalize(moveDirection);
+
+
+    auto toLine = [=] (dvec2 p, dvec2 p1, dvec2 p2) mutable throw() -> double {
+        return fabs( (p2.x - p1.x) * (p.y - p1.y) - (p2.y - p1.y) * (p.x - p1.x) );
+        // x * (a.y - b.y) - y * (a.x - b.x) + a.x * b.y - a.y * b.x = 0
+/*
+        const double eps = 1e-11;
+        const double result = p.x * (p1.y - p2.y) - p.y * (p1.x - p2.x) + p1.x * p2.y - p1.y * p2.x;
+        return (result < 0 ? -result : result) < eps;
+*/
+    };
+
+    if ( toLine(point + result, prevPoint, nextPoint) > toLine(point - result, prevPoint, nextPoint) ) {
+        result *= -1;
+    }
+
+
 
     return result;
 }
@@ -158,106 +176,85 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
                 Point point = line.GetPoint(j);
                 point.z = this->GetAccMapValue(point.x, point.y);
                 if (!point.fixed) {
-                    const Waypoint & waypoint = line.GetWaypointFromPointId(j);
-                    //const size_t index = this->GetAccMapIndexNormalized(point.x, point.y);
+                    bool isClosest = false;
+//                    size_t closestPointId = -1;
 
-                    dvec2 toWaypoint = glm::normalize( dvec2(waypoint.x - point.x, waypoint.y - point.y) );
                     const dvec2 gradVec = this->GetGradient(point);
-                    /*
-                    double toWaypointX = waypoint.x - point.x;
-                    double toWaypointY = waypoint.y - point.y;
-                    const double toWaypointLength = std::sqrt(toWaypointX * toWaypointX + toWaypointY * toWaypointY);
-                    toWaypointX /= toWaypointLength;
-                    toWaypointY /= toWaypointLength;
-                    */
-                    const double stepSize = this->steps.GetAdd(stepNum, waypoint.minDist);
-                    //double stepSize = this->CalculateStepSize(stepNum, waypoint.minDist, stepI);
-
-                    //double xNew = point.x - this->x[index] + toWaypointX * stepSize;
-                    //double yNew = point.y - this->y[index] + toWaypointY * stepSize;
-                    //double xNew, yNew;
-                    
-
-/*
-                    // if this point is closest point
-                    if (j == waypoint.closestPointId) {
-                        if (stepNum == this->steps.GetSize() - 1) {
-                            // maybe need to be changed ?
-                            xNew = waypoint.x;
-                            yNew = waypoint.y;
-                            point.fixed = true;
-                        } else {
-                            xNew = point.x + toWaypointX * stepSize;
-                            yNew = point.y + toWaypointY * stepSize;
-                        }
-                    } else if (point.isSegment) {
-                        xNew = point.x + toWaypointX * stepSize;
-                        yNew = point.y + toWaypointY * stepSize;
-                    } else {
-                        const Point & prevPoint = line.GetPoint(point.prevFixedPointId);
-                        const Point & nextPoint = line.GetPoint(point.nextFixedPointId);
-                        double d1 = sqrt( (prevPoint.x - point.x) * (prevPoint.x - point.x) + (prevPoint.y - point.y) * (prevPoint.y - point.y) );
-                        double d2 = sqrt( (nextPoint.x - point.x) * (nextPoint.x - point.x) + (nextPoint.y - point.y) * (nextPoint.y - point.y) );
-                        double f = d1 / (d1 + d2);
-
-                        if (j > waypoint.closestPointId) {
-                            f = 1.0 - f;
-                        }
-
-                        xNew = point.x - (1.0 - f) * this->x[index] + f * toWaypointX * stepSize;
-                        yNew = point.y - (1.0 - f) * this->y[index] + f * toWaypointY * stepSize;
-                    }
-*/
-                    
-
+                    const double stepSize = this->steps.GetAdd(stepNum);
 
                     double scale = 0.0;
-                    if (j == waypoint.closestPointId || point.isSegment) {
-                        scale = 1.0;
-                    } else {
+                    dvec2 forward = dvec2(0.0, 0.0);
+
+                    //if (!point.isSegment) {
+                        if (point.waypointId == (size_t)-1) throw "waypoint id = -1";
+                        const Waypoint & waypoint = line.GetWaypointFromPointId(j);
+//                        closestPointId = waypoint.closestPointId;
+                        if (j == waypoint.closestPointId) {
+                            isClosest = true;
+                            scale = 1.0;
+                            forward = dvec2(waypoint.x - point.x, waypoint.y - point.y);
+                            // closest point must reach it's waypoint at last step
+                            if (stepNum == this->steps.GetSize() - 1) {
+                                point.id = waypoint.id;
+                                point.fixed = true;
+                            }
+                        }
+                    //} else {
+                    //   scale = 1.0;
+                    //}
+
+                    if (!isClosest) {
                         const Point & prevPoint = line.GetPoint(point.prevFixedPointId);
                         const Point & nextPoint = line.GetPoint(point.nextFixedPointId);
                         const double d1 = glm::distance( dvec2(prevPoint.x, prevPoint.y), dvec2(point.x, point.y) );
                         const double d2 = glm::distance( dvec2(nextPoint.x, nextPoint.y), dvec2(point.x, point.y) );
-                        scale = d1 / (d1 + d2);
-
-                        if (j > waypoint.closestPointId) {
+                        scale = std::min(d1, d2) / (d1 + d2);
+/*
+                        if (closestPointId != (size_t)-1 && j > closestPointId) {
                             scale = 1.0 - scale;
                         }
-
+*/
                         dvec2 w1, w2;
+                        size_t id1, id2;
                         if (prevPoint.waypointId != (size_t)-1) {
                             const Waypoint & prevWaypoint = line.GetWaypoint(prevPoint.waypointId);
                             w1 = dvec2(prevWaypoint.x, prevWaypoint.y);
+                            id1 = prevWaypoint.id;
                         } else {
                             w1 = dvec2(prevPoint.x, prevPoint.y);
+                            id1 = prevPoint.id;
                         }
 
                         if (nextPoint.waypointId != (size_t)-1) {
                             const Waypoint & nextWaypoint = line.GetWaypoint(nextPoint.waypointId);
                             w2 = dvec2(nextWaypoint.x, nextWaypoint.y);
+                            id2 = nextWaypoint.id;
                         } else {
                             w2 = dvec2(nextPoint.x, nextPoint.y);
+                            id2 = nextPoint.id;
                         }
 
-                        toWaypoint = this->GetForwordDirection(w1, w2, dvec2(point.x, point.y));
+                        forward = this->GetForwordDirection(w1, w2, dvec2(point.x, point.y));
+
+                        if ( line.segments.find( std::make_pair( std::min(id1, id2), std::max(id1, id2) ) ) != line.segments.end() ) {
+                            scale = 1.0;
+                        }
                     }
 
-                    
-                    dvec2 newPoint = dvec2(point.x, point.y) - (1.0 - scale) * gradVec + scale * (toWaypoint * stepSize);
 
-
-                    // closest point must reach it's waypoint at last step
-                    if (j == waypoint.closestPointId && stepNum == this->steps.GetSize() - 1) {
-                        newPoint = dvec2(waypoint.x, waypoint.y);
-                        point.fixed = true;
-                    }
-
+                    dvec2 newPoint = dvec2(point.x, point.y) - (1.0 - scale) * gradVec + (scale * stepSize) * forward;
 
                     if (newPoint.x < 0.0 || newPoint.x > 1.0 || newPoint.y < 0.0 || newPoint.y > 1.0) {
                         newPoint = dvec2(point.x, point.y);
                     }
 
+// debug
+/*
+                    if (newPoint.x < 0.1 || newPoint.y < 0.1) {
+                        throw "Gradient.cpp:226---";
+                        std::cout << point.x << " " << point.y << std::endl;
+                    }
+*/
                     point.x = newPoint.x;
                     point.y = newPoint.y;
                     point.z += 0.02f;

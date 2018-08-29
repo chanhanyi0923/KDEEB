@@ -6,6 +6,10 @@
 class Point
 {
 public:
+    // the id of this point in database (for compare if two points are 'equal')
+    // don't use eps or == to compare two points
+    size_t id;
+
     // previous fixed point id
     // ( = -1 if the point itself is fixed of is others' closest point)
     size_t prevFixedPointId;
@@ -29,8 +33,8 @@ public:
 	Point(double x, double y, double z, double time, double timeInt);
 	~Point();
 
-    bool Compare2D(const Point & point) const;
-	bool operator == (const Point & point) const;
-	bool operator != (const Point & point) const;
+    bool CompareId(const Point & point) const;
+	//bool operator == (const Point & point) const;
+	//bool operator != (const Point & point) const;
 };
 

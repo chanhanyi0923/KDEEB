@@ -16,6 +16,6 @@ public:
     Steps();
     Steps(const size_t size);
     size_t GetSize() const;
-    double GetAdd(const size_t index, const double curDis) const;
+    double GetAdd(const size_t index) const;
 };
 

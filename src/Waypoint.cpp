@@ -1,6 +1,7 @@
 #include "Waypoint.h"
 
-Waypoint::Waypoint(double x, double y):
+Waypoint::Waypoint(double x, double y, size_t id):
+    id(id),
     x(x),
     y(y),
     closestPointId(-1),

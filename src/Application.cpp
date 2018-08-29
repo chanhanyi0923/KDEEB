@@ -240,7 +240,7 @@ void Application::NonRealTimeBundleWithWaypoint()
 
     this->InitBundle();
 
-    for (int fileNum = 1; fileNum <= 35; fileNum ++) {
+    for (int fileNum = 1; fileNum <= 26; fileNum ++) {
 
 
 /*
@@ -313,23 +313,43 @@ void Application::NonRealTimeBundleWithWaypoint()
         for (string stringLine; getline(fin, stringLine); ) {
             stringstream buffer1(stringLine);
             int lineIndex;
-            double ox, oy, dx, dy;
+            int oIdInput, dIdInput;
             string mincut;
-            buffer1 >> lineIndex >> ox >> oy >> dx >> dy;
+            buffer1 >> lineIndex >> oIdInput >> dIdInput;
 
             lineIndex --;
 
             Line & line = this->dataSet.lines[lineIndex];
 
-            const size_t oId = line.FindPointIndex(Point(ox, oy, 0));
-            const size_t dId = line.FindPointIndex(Point(dx, dy, 0));
+/*
+            if (line.GetPointSize() == 0) continue;
+            try {
+                line.FindPointIndexById(oIdInput - 1);
+                line.FindPointIndexById(dIdInput - 1);
+            } catch (...) {
+                line = Line();
+                std::cout << lineIndex + 1 << std::endl;
+                continue;
+            }
+*/
 
+
+            const size_t oId = line.FindPointIndexById(oIdInput - 1);
+            const size_t dId = line.FindPointIndexById(dIdInput - 1);
+/*
+            if (oId == -1 || dId == -1) {
+                line = Line();
+                continue;
+            }
+*/
             for (string w; getline(buffer1, w, ','); ) {
                 stringstream buffer3(w);
-                double waypointX, waypointY;
-                buffer3 >> waypointX >> waypointY;
+                int wId;
+                buffer3 >> wId;
+                const Point &rp = this->refPoints[wId - 1];
+                Waypoint wp(rp.x, rp.y, rp.id);
 
-                line.AddWaypoint(oId, dId, Waypoint(waypointX, waypointY));
+                line.AddWaypoint(oId, dId, wp);
             }
         }
         fin.close();
@@ -337,22 +357,35 @@ void Application::NonRealTimeBundleWithWaypoint()
 
         // load routes
         //sprintf(filename, "others/test2lines/routes_%d.txt", fileNum - 1);
-        sprintf(filename, "%sroutes_%d.txt", this->inputPath, fileNum - 1);
+        sprintf(filename, "%sroutes_%d.txt", this->inputPath, fileNum);
 
         fin.open(filename, fstream::in);
         for (string stringLine; getline(fin, stringLine); ) {
             stringstream buffer1(stringLine);
-            int lineIndex;
-            double ox, oy, dx, dy;
-            buffer1 >> lineIndex >> ox >> oy >> dx >> dy;
+            int lineIndex, oIdInput, dIdInput;
+            buffer1 >> lineIndex >> oIdInput >> dIdInput;
             lineIndex --;
 
             Line & line = this->dataSet.lines[lineIndex];
+/*
+            try {
+                line.FindPointIndexById(oIdInput - 1);
+                line.FindPointIndexById(dIdInput - 1);
+            } catch (...) {
+                line = Line();
+                std::cout << lineIndex + 1 << std::endl;
+                continue;
+            }
+*/
+//            if (line.GetPointSize() == 0) continue;
 
-            const size_t oId = line.FindPointIndex(Point(ox, oy, 0));
-            const size_t dId = line.FindPointIndex(Point(dx, dy, 0));
+            line.AddSegment(oIdInput - 1, dIdInput - 1);
+//            const size_t oId = line.FindPointIndexById(oIdInput - 1);
+//            const size_t dId = line.FindPointIndexById(dIdInput - 1);
 
-            line.AddSegment(oId, dId);
+//            this->segments.insert[];
+
+//            line.AddSegment(oId, dId);
         }
         fin.close();
 
@@ -371,7 +404,7 @@ void Application::NonRealTimeBundleWithWaypoint()
 
 
         // Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling))
-        this->BundleWithWaypoint(Iteration(20, 200, 20, 0.1, 0.1, true));
+        this->BundleWithWaypoint(Iteration(20, 200, 20, 0.001, 0.1, true));
 
         //#pragma omp parallel for
         for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
@@ -464,6 +497,11 @@ void Application::Bundle(const Iteration & iteration)
 
 void Application::BundleWithWaypoint(const Iteration & iteration)
 {
+    static int c = 0;
+
+
+
+
     const uint32_t textureWidth = iteration.textureWidth;
 
     Framebuffer framebuffer(iteration.textureWidth);
@@ -489,7 +527,7 @@ void Application::BundleWithWaypoint(const Iteration & iteration)
             this->dataSet.RemovePointsInSegment();
         }
         //
-        static int c = 0;
+
         char s[100];
         sprintf(s, "./out/%d.txt", c);
         this->Output(s);

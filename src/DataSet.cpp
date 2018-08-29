@@ -112,7 +112,7 @@ void DataSet::AddRemovePoints(double removeDist, double splitDist)
                 }
             }
 
-            if (line.GetLastPoint() != source.GetLastPoint()) {
+            if ( !line.GetLastPoint().CompareId( source.GetLastPoint() ) ) {
                 source.AddPoint(line.GetLastPoint());
             }
 
@@ -138,7 +138,7 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
     const double removeDist2 = removeDist * removeDist;
     const double splitDist2 = splitDist * splitDist;
 
-    #pragma omp parallel for
+    // #pragma omp parallel for
     for (size_t i = 0; i < this->lines.size(); i ++) {
         const Line & line = this->lines[i];
         if (line.GetPointSize() >= 2) {
@@ -149,13 +149,12 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
 
             for (size_t j = 1; j < line.GetPointSize(); j ++) {
                 const Point & point = line.GetPoint(j);
-                Waypoint waypoint = line.GetWaypointFromPointId(j);
 
                 const double dist = (prevPoint.x - point.x) * (prevPoint.x - point.x) +
                                     (prevPoint.y - point.y) * (prevPoint.y - point.y);
 
                 bool keepPoint = false;
-                if (dist > splitDist2 && !(prevPoint.isSegment && point.isSegment)) {
+                if (dist > splitDist2 && !(prevPoint.isSegment && point.isSegment) ) {
                     Point newPoint(
                         (prevPoint.x + point.x) / 2.0,
                         (prevPoint.y + point.y) / 2.0,
@@ -177,10 +176,14 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
                     keepPoint = true;
                 } else if (point.fixed) {
                     keepPoint = true;
-                } else if (j == waypoint.closestPointId) {
-                    keepPoint = true;
-                    // update closest point
-                    waypoint.closestPointId = source.GetPointSize();
+                } else if (point.waypointId != (size_t)-1) {
+                    Waypoint waypoint = line.GetWaypointFromPointId(j);
+
+                    if (j == waypoint.closestPointId) {
+                        keepPoint = true;
+                        // update closest point
+                        waypoint.closestPointId = source.GetPointSize();
+                    }
                 }
 
                 if (keepPoint) {
@@ -189,7 +192,8 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
                 }
             }
 
-            if (line.GetLastPoint() != source.GetLastPoint()) {
+            if ( !line.GetLastPoint().CompareId( source.GetLastPoint() ) ) {
+//            if (line.GetLastPoint() != source.GetLastPoint()) {
                 source.AddPoint(line.GetLastPoint());
             }
 
@@ -202,6 +206,8 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
                 source.SetPoint(k, point);
             }
 
+            source.id = line.id;
+            source.segments = line.segments;
             source.AddWaypoints(line);
             source.UpdatePoints();
             this->lines[i] = source;
@@ -290,7 +296,7 @@ void DataSet::SmoothTrailsWithWaypoint(const double interp)
             for (size_t count = 0; count < iterationCount; count ++) {
                 for (size_t i = 1; i < lineSize - 1; i ++) {
                     const Point & point = line.GetPoint(i);
-                    if (point.fixed || point.isSegment) {
+                    if (point.fixed/* || point.isSegment*/) {
                         continue;
                     }
 
@@ -336,12 +342,27 @@ void DataSet::SmoothShifting(const Line & line, std::vector< std::pair<float, fl
 
     const size_t beginI = std::max((int)indexLowerBound, (int)index - smoothRange);
     const size_t endI = std::min((int)indexUpperBound, (int)index + smoothRange);
-    for (size_t i = beginI; i <= endI; i ++) {
+
+    for (size_t i = index; i >= beginI; i --) {
         const Point & point = line.GetPoint(i);
+        if (point.fixed) {
+            break;
+        }
         nearPointsAvgX += point.x;
         nearPointsAvgY += point.y;
         nearPointsSize ++;
     }
+
+    for (size_t i = index; i <= endI; i ++) {
+        const Point & point = line.GetPoint(i);
+        if (point.fixed) {
+            break;
+        }
+        nearPointsAvgX += point.x;
+        nearPointsAvgY += point.y;
+        nearPointsSize ++;
+    }
+
     nearPointsAvgX /= nearPointsSize;
     nearPointsAvgY /= nearPointsSize;
 
