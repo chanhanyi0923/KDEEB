@@ -138,7 +138,7 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
     const double removeDist2 = removeDist * removeDist;
     const double splitDist2 = splitDist * splitDist;
 
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for (size_t i = 0; i < this->lines.size(); i ++) {
         const Line & line = this->lines[i];
         if (line.GetPointSize() >= 2) {
@@ -376,7 +376,11 @@ void DataSet::RemovePointsInSegment()
     #pragma omp parallel for
     for (size_t i = 0; i < this->lines.size(); i ++) {
         Line & line = this->lines[i];
-        line.RemovePointsInSegment();
+        try {
+            line.RemovePointsInSegment();
+        } catch (...) {
+            line = Line();
+        }
     }
 }
 

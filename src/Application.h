@@ -21,7 +21,7 @@ class Application
 private:
 
     // temp
-    const char * inputPath = "/home/hanyi/KDEEB/others/test5/";
+    const char * inputPath;// = "/home/hanyi/KDEEB/others/test7/9/";
 
     //const double obstacleRadius = 0.0;
 	const float pointSplitDistant = 0.0006f;

@@ -14,7 +14,7 @@ void Application::Input()
     sprintf(file1, "%snodes.txt", this->inputPath);
     fstream nodeIn;
     nodeIn.open(file1, fstream::in);
-    this->refPoints.resize(160000);
+    this->refPoints.resize(500000);
     for (string line; getline(nodeIn, line); ) {
         stringstream buffer(line);
         int index;
@@ -36,7 +36,7 @@ void Application::Input()
     fstream lineIn;
     lineIn.open(file2, fstream::in);
 
-    this->dataSet.lines.resize(160000);
+    this->dataSet.lines.resize(500000);
 
     for (string stringLine; getline(lineIn, stringLine); ) {
         stringstream buffer(stringLine);
@@ -51,7 +51,31 @@ void Application::Input()
         line.AddPoint(this->refPoints[o - 1]);
         line.AddPoint(this->refPoints[d - 1]);
         line.id = id - 1;
+
+        //std::cout << line.id << std::endl;
         this->dataSet.lines[id - 1] = line;
+    }
+
+    lineIn.close();
+
+
+
+    char file3[100];
+    sprintf(file3, "%smore.txt", this->inputPath);
+    fstream output_kdeeb;
+    output_kdeeb.open(file3, fstream::in);
+
+    for (string stringLine; getline(output_kdeeb, stringLine); ) {
+        stringstream buffer(stringLine);
+        if (stringLine == "" || stringLine == " ") {
+            continue;
+        }
+
+        int id;
+        double x, y;
+        buffer >> id >> x >> y;
+        Point p(x, y, 0);
+        this->dataSet.lines[id - 1].AddSecondLastPoint(p);
     }
 
     lineIn.close();

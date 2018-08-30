@@ -16,6 +16,15 @@ Line::~Line()
 }
 
 
+void Line::AddSecondLastPoint(const Point & point)
+{
+    Point back = this->points.back();
+    this->points.pop_back();
+    this->points.push_back(point);
+    this->points.push_back(back);
+}
+
+
 //debug
 bool Line::checkPoints()
 {

@@ -44,6 +44,9 @@ public:
     void SetLastPoint(const Point & point);
     void SetPoint(const size_t index, const Point & point);
     void AddPoint(const Point & point);
+
+
+    void AddSecondLastPoint(const Point & point);
 //    size_t FindPointIndex(const Point & point) const;
     size_t FindPointIndexById(const size_t id) const;
 

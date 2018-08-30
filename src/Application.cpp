@@ -210,6 +210,10 @@ void Application::Config()
 
 void Application::Run(const char * inputFile, const char * outputFile)
 {
+    this->inputPath = inputFile;
+
+
+
     clock_t start, end;
     start = clock();
 
@@ -321,8 +325,8 @@ void Application::NonRealTimeBundleWithWaypoint()
 
             Line & line = this->dataSet.lines[lineIndex];
 
-/*
             if (line.GetPointSize() == 0) continue;
+/*
             try {
                 line.FindPointIndexById(oIdInput - 1);
                 line.FindPointIndexById(dIdInput - 1);
@@ -377,7 +381,7 @@ void Application::NonRealTimeBundleWithWaypoint()
                 continue;
             }
 */
-//            if (line.GetPointSize() == 0) continue;
+            if (line.GetPointSize() == 0) continue;
 
             line.AddSegment(oIdInput - 1, dIdInput - 1);
 //            const size_t oId = line.FindPointIndexById(oIdInput - 1);
@@ -404,7 +408,9 @@ void Application::NonRealTimeBundleWithWaypoint()
 
 
         // Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling))
-        this->BundleWithWaypoint(Iteration(20, 200, 20, 0.001, 0.1, true));
+        //this->BundleWithWaypoint(Iteration(20, 200, 20, 0.001, 0.1, true));
+        this->BundleWithWaypoint(Iteration(20, 200, 20, 0.1, 0.1, true));
+
 
         //#pragma omp parallel for
         for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
