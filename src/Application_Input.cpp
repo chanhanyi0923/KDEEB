@@ -11,7 +11,7 @@ void Application::Input()
 
 
     char file1[100];
-    sprintf(file1, "%snodes.txt", this->inputPath);
+    sprintf(file1, "/home/hanyi/KDEEB/others/test7/nodes.txt", this->inputPath);
     fstream nodeIn;
     nodeIn.open(file1, fstream::in);
     this->refPoints.resize(500000);

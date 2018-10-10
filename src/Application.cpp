@@ -181,7 +181,7 @@ void Application::Output(const char * outputFile)
 void Application::Config()
 {
     std::fstream iterationConf;
-    iterationConf.open("iteration.conf", std::fstream::in);
+    iterationConf.open("/home/hanyi/KDEEB/others/test7/iteration.conf", std::fstream::in);
     if (!iterationConf) {
         throw RenderException("Configuration not found");
     }
@@ -219,7 +219,7 @@ void Application::Run(const char * inputFile, const char * outputFile)
 
     this->InitOpenGL();
 
-    //this->Config();
+    this->Config();
 
     //this->Input(inputFile);
     this->Input();
@@ -326,7 +326,8 @@ void Application::NonRealTimeBundleWithWaypoint()
             Line & line = this->dataSet.lines[lineIndex];
 
             if (line.GetPointSize() == 0) continue;
-/*
+
+
             try {
                 line.FindPointIndexById(oIdInput - 1);
                 line.FindPointIndexById(dIdInput - 1);
@@ -335,7 +336,6 @@ void Application::NonRealTimeBundleWithWaypoint()
                 std::cout << lineIndex + 1 << std::endl;
                 continue;
             }
-*/
 
 
             const size_t oId = line.FindPointIndexById(oIdInput - 1);
@@ -372,6 +372,7 @@ void Application::NonRealTimeBundleWithWaypoint()
 
             Line & line = this->dataSet.lines[lineIndex];
 /*
+
             try {
                 line.FindPointIndexById(oIdInput - 1);
                 line.FindPointIndexById(dIdInput - 1);
@@ -380,7 +381,9 @@ void Application::NonRealTimeBundleWithWaypoint()
                 std::cout << lineIndex + 1 << std::endl;
                 continue;
             }
+
 */
+
             if (line.GetPointSize() == 0) continue;
 
             line.AddSegment(oIdInput - 1, dIdInput - 1);
@@ -409,7 +412,7 @@ void Application::NonRealTimeBundleWithWaypoint()
 
         // Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling))
         //this->BundleWithWaypoint(Iteration(20, 200, 20, 0.001, 0.1, true));
-        this->BundleWithWaypoint(Iteration(20, 200, 20, 0.1, 0.1, true));
+        this->BundleWithWaypoint(this->iterationsForNonRealTime[0]);
 
 
         //#pragma omp parallel for
@@ -535,7 +538,7 @@ void Application::BundleWithWaypoint(const Iteration & iteration)
         //
 
         char s[100];
-        sprintf(s, "./out/%d.txt", c);
+        sprintf(s, "/home/hanyi/KDEEB/build/out/%d.txt", c);
         this->Output(s);
         //num = c;
         c ++;
