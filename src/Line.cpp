@@ -148,7 +148,7 @@ size_t Line::FindPointIndexById(const size_t id) const
 */
         std::cout << "line id: " << this->id << std::endl;
 
-        throw "index = -1";
+        //throw "index = -1";
     }
 
     return index;
@@ -197,12 +197,14 @@ size_t Line::GetWaypointSize() const
 }
 
 
-void Line::AddWaypoint(const size_t oId, const size_t dId, Waypoint waypoint)
+void Line::AddWaypoint(const size_t oId_, const size_t dId_, Waypoint waypoint)
 {
-    if (dId < oId) {
-        throw "!!!";
+    const size_t oId = (dId_ < oId_) ? dId_ : oId_;
+    const size_t dId = (dId_ < oId_) ? oId_ : dId_;
+//    if (dId < oId) {
+//        throw "!!!";
 //        std::swap(oId, dId);
-    }
+//    }
 
     waypoint.oId = oId;
     waypoint.dId = dId;
@@ -357,12 +359,10 @@ void Line::UpdatePoints()
         }
         if (!hasWaypoint) {
             if (!point.fixed/* && !point.isSegment*/) {
-
+                point.fixed = true;
 
                 
 
-                std::cout << "error" << std::endl;
-                throw "! error";
             }
             point.waypointId = -1;
         }

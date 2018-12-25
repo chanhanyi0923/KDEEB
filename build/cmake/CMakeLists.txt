@@ -32,6 +32,8 @@ add_executable(
     ${SRC_DIR}/Line.cpp
     ${SRC_DIR}/RenderException.cpp
     ${SRC_DIR}/Waypoint.cpp
+    ${SRC_DIR}/GridGraph.cpp
+    ${SRC_DIR}/MinCutSolver.hpp
 )
 
 set_target_properties(
@@ -42,6 +44,8 @@ set_target_properties(
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../lib"
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../lib"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../bin"
+
+    INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../../include"
 )
 
 set(COMMON_OPTIONS "-Wall -Wextra -Wno-reorder")
@@ -50,8 +54,8 @@ set(COMMON_OPTIONS "-Wall -Wextra -Wno-reorder")
 target_compile_options(
     main
     PRIVATE
-    #-g -Wall -Wextra -Wno-reorder
-    -O3 -fopenmp -Wall -Wextra -Wno-reorder
+    -g -Wall -Wextra -Wno-reorder
+    #-O3 -fopenmp -Wall -Wextra -Wno-reorder
 )
 
 #target_compile_options(
@@ -64,6 +68,6 @@ target_compile_options(
 target_link_libraries(
     main
     PRIVATE
-    -L/usr/lib/nvidia-396 -lOpenGL -lEGL
+    -L/usr/lib/nvidia-410 -lOpenGL -lEGL
 )
 

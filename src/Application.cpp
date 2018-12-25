@@ -244,158 +244,18 @@ void Application::NonRealTimeBundleWithWaypoint()
 
     this->InitBundle();
 
+    this->dataSet.CreateGridGraph();
+
     for (int fileNum = 1; fileNum <= 26; fileNum ++) {
 
-
-/*
-        // load waypoints
-        char filename[100];
-        // others/Morphing/data/waypoints_1.txt
-        sprintf(filename, "others/Morphing/data/13/waypoints_%d.txt", fileNum);
-
-        fstream fin;
-        fin.open(filename, fstream::in);
-        for (string stringLine; getline(fin, stringLine); ) {
-            stringstream buffer1(stringLine);
-            int lineIndex, oIndex, dIndex, waypointIndex;
-            string mincut;
-            buffer1 >> lineIndex >> oIndex >> dIndex >> mincut;
-
-            lineIndex --;
-            oIndex --;
-            dIndex --;
-
-            Line & line = this->dataSet.lines[lineIndex];
-
-            stringstream buffer2(mincut);
-            for (string w; getline(buffer2, w, ','); ) {
-                stringstream buffer3(w);
-                buffer3 >> waypointIndex;
-                waypointIndex --;
-
-                const Point p = this->refPoints[waypointIndex];
-
-                const size_t oId = line.FindPointIndex(this->refPoints[oIndex]);
-                const size_t dId = line.FindPointIndex(this->refPoints[dIndex]);
-                line.AddWaypoint(oId, dId, Waypoint(p.x, p.y));
+        for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
+            Line & line = this->dataSet.lines[i];
+            if (line.GetPointSize() > 0 && line.id > 1000000) {
+                std::cout << i << std::endl;
+                throw "line id error in Application::NonRealTimeBundleWithWaypoint";
             }
         }
-        fin.close();
-
-
-        // load routes
-        sprintf(filename, "others/Morphing/data/13/routes_%d.txt", fileNum);
-
-        fin.open(filename, fstream::in);
-        for (string stringLine; getline(fin, stringLine); ) {
-            stringstream buffer1(stringLine);
-            int lineIndex, oIndex, dIndex;
-            buffer1 >> lineIndex >> oIndex >> dIndex;
-
-            lineIndex --;
-            oIndex --;
-            dIndex --;
-
-            Line & line = this->dataSet.lines[lineIndex];
-            const size_t oId = line.FindPointIndex(this->refPoints[oIndex]);
-            const size_t dId = line.FindPointIndex(this->refPoints[dIndex]);
-            line.AddSegment(oId, dId);
-        }
-        fin.close();
-*/
-
-        // test 2
-        // load waypoints
-        char filename[100];
-        // others/Morphing/data/waypoints_1.txt
-        //sprintf(filename, "others/test2lines/waypoints_%d.txt", fileNum);
-        sprintf(filename, "%swaypoints_%d.txt", this->inputPath, fileNum);
-
-
-        fstream fin;
-        fin.open(filename, fstream::in);
-        for (string stringLine; getline(fin, stringLine); ) {
-            stringstream buffer1(stringLine);
-            int lineIndex;
-            int oIdInput, dIdInput;
-            string mincut;
-            buffer1 >> lineIndex >> oIdInput >> dIdInput;
-
-            lineIndex --;
-
-            Line & line = this->dataSet.lines[lineIndex];
-
-            if (line.GetPointSize() == 0) continue;
-
-
-            try {
-                line.FindPointIndexById(oIdInput - 1);
-                line.FindPointIndexById(dIdInput - 1);
-            } catch (...) {
-                line = Line();
-                std::cout << lineIndex + 1 << std::endl;
-                continue;
-            }
-
-
-            const size_t oId = line.FindPointIndexById(oIdInput - 1);
-            const size_t dId = line.FindPointIndexById(dIdInput - 1);
-/*
-            if (oId == -1 || dId == -1) {
-                line = Line();
-                continue;
-            }
-*/
-            for (string w; getline(buffer1, w, ','); ) {
-                stringstream buffer3(w);
-                int wId;
-                buffer3 >> wId;
-                const Point &rp = this->refPoints[wId - 1];
-                Waypoint wp(rp.x, rp.y, rp.id);
-
-                line.AddWaypoint(oId, dId, wp);
-            }
-        }
-        fin.close();
-
-
-        // load routes
-        //sprintf(filename, "others/test2lines/routes_%d.txt", fileNum - 1);
-        sprintf(filename, "%sroutes_%d.txt", this->inputPath, fileNum);
-
-        fin.open(filename, fstream::in);
-        for (string stringLine; getline(fin, stringLine); ) {
-            stringstream buffer1(stringLine);
-            int lineIndex, oIdInput, dIdInput;
-            buffer1 >> lineIndex >> oIdInput >> dIdInput;
-            lineIndex --;
-
-            Line & line = this->dataSet.lines[lineIndex];
-/*
-
-            try {
-                line.FindPointIndexById(oIdInput - 1);
-                line.FindPointIndexById(dIdInput - 1);
-            } catch (...) {
-                line = Line();
-                std::cout << lineIndex + 1 << std::endl;
-                continue;
-            }
-
-*/
-
-            if (line.GetPointSize() == 0) continue;
-
-            line.AddSegment(oIdInput - 1, dIdInput - 1);
-//            const size_t oId = line.FindPointIndexById(oIdInput - 1);
-//            const size_t dId = line.FindPointIndexById(dIdInput - 1);
-
-//            this->segments.insert[];
-
-//            line.AddSegment(oId, dId);
-        }
-        fin.close();
-
+    this->dataSet.UpdateWaypoints(this->refPoints);
 
         // bundle
         //#pragma omp parallel for

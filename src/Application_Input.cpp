@@ -7,119 +7,122 @@ void Application::Input()
     using std::string;
     using std::stringstream;
 
+    // read nodes
+    {
+        char file1[100] = "/home/hanyi/KDEEB/others/test9/Nodes.csv";
+        //sprintf(file1, "/home/hanyi/KDEEB/others/test7/nodes.txt", this->inputPath);
+        fstream nodeIn;
+        nodeIn.open(file1, fstream::in);
+        this->refPoints.resize(500000);
 
-
-
-    char file1[100];
-    sprintf(file1, "/home/hanyi/KDEEB/others/test7/nodes.txt", this->inputPath);
-    fstream nodeIn;
-    nodeIn.open(file1, fstream::in);
-    this->refPoints.resize(500000);
-    for (string line; getline(nodeIn, line); ) {
-        stringstream buffer(line);
         int index;
-        double x1, y1;
-        buffer >> index >> x1 >> y1;
-        Point p(x1, y1, 0);
-        p.fixed = true;
-        p.id = index - 1;
-        this->refPoints[index - 1] = p;
-    }
-    nodeIn.close();
-
-
-
-
-    char file2[100];
-    sprintf(file2, "%strip.txt", this->inputPath);
-    //const char * file2 = "others/test2lines/trip.txt";
-    fstream lineIn;
-    lineIn.open(file2, fstream::in);
-
-    this->dataSet.lines.resize(500000);
-
-    for (string stringLine; getline(lineIn, stringLine); ) {
-        stringstream buffer(stringLine);
-        if (stringLine == "" || stringLine == " ") {
-            this->dataSet.lines.push_back(Line());
-            continue;
-        }
-
-        int id, o, d;
-        buffer >> id >> o >> d;
-        Line line;
-        line.AddPoint(this->refPoints[o - 1]);
-        line.AddPoint(this->refPoints[d - 1]);
-        line.id = id - 1;
-
-        //std::cout << line.id << std::endl;
-        this->dataSet.lines[id - 1] = line;
-    }
-
-    lineIn.close();
-
-
-
-    char file3[100];
-    sprintf(file3, "%smore.txt", this->inputPath);
-    fstream output_kdeeb;
-    output_kdeeb.open(file3, fstream::in);
-
-    for (string stringLine; getline(output_kdeeb, stringLine); ) {
-        stringstream buffer(stringLine);
-        if (stringLine == "" || stringLine == " ") {
-            continue;
-        }
-
-        int id;
         double x, y;
-        buffer >> id >> x >> y;
-        Point p(x, y, 0);
-        this->dataSet.lines[id - 1].AddSecondLastPoint(p);
+        std::string str, str2, str3;
+        while (std::getline(nodeIn, str)) {
+            std::stringstream ss(str);
+            {
+                std::getline(ss, str2, ',');
+                std::stringstream ss2(str2);
+                ss2 >> index;
+                index--;
+            }
+            {
+                std::getline(ss, str2, ',');
+                std::stringstream ss2(str2);
+                ss2 >> x;
+            }
+            {
+                std::getline(ss, str2, ',');
+                std::stringstream ss2(str2);
+                ss2 >> y;
+            }
+
+            Point p(x, y, 0);
+            p.fixed = true;
+            p.id = index;
+            this->refPoints[index] = p;
+        }
+        nodeIn.close();
     }
 
-    lineIn.close();
+    this->dataSet.xMin = this->dataSet.yMin = std::numeric_limits<double>::max();
+    this->dataSet.xMax = this->dataSet.yMax = std::numeric_limits<double>::min();
+    {
+        char file2[100] = "/home/hanyi/KDEEB/others/test9/sample4.csv";
+        //sprintf(file2, "%strip.txt", this->inputPath);
+        //const char * file2 = "others/test2lines/trip.txt";
+        fstream lineIn;
+        lineIn.open(file2, fstream::in);
+
+        this->dataSet.lines.resize(500000);
+        this->dataSet.rawLines.resize(500000);
+
+        std::string buffer, buffer2;
+
+        int trips_size = 0; // count of trips
+
+        while (std::getline(lineIn, buffer)) {
+            std::stringstream ss(buffer);
+            std::vector<Point> rawLine;
+            for (int index = 0; ss >> index; ) {
+                index --;
+                Point p = this->refPoints[index];
+                p.fixed = false;
+                rawLine.push_back(p);
+                this->dataSet.xMin = std::min(this->dataSet.xMin, p.x);
+                this->dataSet.yMin = std::min(this->dataSet.yMin, p.y);
+                this->dataSet.xMax = std::max(this->dataSet.xMax, p.x);
+                this->dataSet.yMax = std::max(this->dataSet.yMax, p.y);
+
+            }
+            rawLine.front().fixed = true;
+            rawLine.back().fixed = true;
+            this->dataSet.rawLines[trips_size] = rawLine;
+
+            Line line;
+            line.AddPoint(rawLine.front());
+            line.AddPoint(rawLine.back());
+            line.id = trips_size;
+            this->dataSet.lines[trips_size] = line;
+            trips_size ++;
+        }
+        lineIn.close();
+    }
+
+    // normalize
+    for (size_t i = 0; i < 500000; i ++) {
+        double x = this->refPoints[i].x;
+        double y = this->refPoints[i].y;
+        x = (x - this->dataSet.xMin) / (this->dataSet.xMax - this->dataSet.xMin);
+        y = (y - this->dataSet.yMin) / (this->dataSet.yMax - this->dataSet.yMin);
+        this->refPoints[i].x = x;
+        this->refPoints[i].y = y;
+    }
+
+    for (size_t i = 0; i < 500000; i ++) {
+        Line & line = this->dataSet.lines[i];
+        for (size_t j = 0; j < line.GetPointSize(); j ++) {
+            Point p = this->refPoints[line.GetPoint(j).id];
+            line.SetPoint(j, p);
+        }
+    }
+    // char file3[100];
+    // sprintf(file3, "%smore.txt", this->inputPath);
+    // fstream output_kdeeb;
+    // output_kdeeb.open(file3, fstream::in);
+
+    // for (string stringLine; getline(output_kdeeb, stringLine); ) {
+        // stringstream buffer(stringLine);
+        // if (stringLine == "" || stringLine == " ") {
+            // continue;
+        // }
+
+        // int id;
+        // double x, y;
+        // buffer >> id >> x >> y;
+        // Point p(x, y, 0);
+        // this->dataSet.lines[id - 1].AddSecondLastPoint(p);
+    // }
+
+    // lineIn.close();
 }
-
-
-/*
-void Application::Input()
-{
-    using std::fstream;
-    using std::string;
-    using std::stringstream;
-
-    const char * file1 = "others/Morphing/data/morphingTest_normalizedNodeLocations.txt";
-
-    fstream nodeIn;
-    nodeIn.open(file1, fstream::in);
-    for (string line; getline(nodeIn, line); ) {
-        stringstream buffer(line);
-        double x1, y1;
-        buffer >> x1 >> y1;
-        this->refPoints.push_back(Point(x1, y1, 0));
-    }
-    nodeIn.close();
-
-    const char * file2 = "others/Morphing/data/13/morphingTest_normalizedLines.txt";
-    fstream lineIn;
-    lineIn.open(file2, fstream::in);
-    for (string stringLine; getline(lineIn, stringLine); ) {
-        stringstream buffer(stringLine);
-        double x1, y1, x2, y2;
-        buffer >> x1 >> y1 >> x2 >> y2;
-        Line line;
-        Point p1(x1, y1, 0);
-        Point p2(x2, y2, 0);
-        p1.fixed = true;
-        p2.fixed = true;
-        line.AddPoint(p1);
-        line.AddPoint(p2);
-        this->dataSet.lines.push_back(line);
-    }
-
-    lineIn.close();
-}
-*/
-
-

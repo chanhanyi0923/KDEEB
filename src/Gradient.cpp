@@ -175,7 +175,7 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
             for (size_t j = 0; j < line.GetPointSize(); j++) {
                 Point point = line.GetPoint(j);
                 point.z = this->GetAccMapValue(point.x, point.y);
-                if (!point.fixed) {
+                if (!point.fixed && point.waypointId != (size_t)-1) {
                     bool isClosest = false;
 //                    size_t closestPointId = -1;
 

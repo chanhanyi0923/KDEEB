@@ -3,11 +3,13 @@
 
 DataSet::DataSet()
 {
+
 }
 
 
 DataSet::DataSet(size_t size)
 {
+
     this->lines.resize(size);
 }
 
@@ -73,6 +75,114 @@ std::ostream & operator << (std::ostream & output, const DataSet & dataSet)
     output << std::resetiosflags(std::ios::showbase);
 
     return output;
+}
+
+#define GRID_WIDTH 0.0003
+size_t DataSet::GetGridIndexOfX(double x)
+{
+	return floor( (x - this->xMin + 0.5 * GRID_WIDTH) / GRID_WIDTH );
+}
+
+
+size_t DataSet::GetGridIndexOfY(double y)
+{
+	return floor( (y - this->yMin + 0.5 * GRID_WIDTH) / GRID_WIDTH );
+}
+
+
+void DataSet::CreateGridGraph()
+{
+    gridGraph.SetTripSize(500000);
+    gridGraph.SetMaxFlow(500000);
+	size_t x_num = 1 + ceil( (this->xMax - this->xMin + GRID_WIDTH) / GRID_WIDTH );
+	size_t y_num = 1 + ceil( (this->yMax - this->yMin + GRID_WIDTH) / GRID_WIDTH );
+    gridGraph.SetGridSize(x_num, y_num);
+    for (int i = 0; i < 500000; i ++) {
+        for (const Point & p: rawLines[i]) {
+            int x = GetGridIndexOfX(p.x);
+            int y = GetGridIndexOfY(p.y);
+            gridGraph.AddPoint(i, x, y);
+        }
+    }
+    gridGraph.ConvertToGrid();
+    this->minCutSolver.SetData(&this->gridGraph);
+}
+
+
+void DataSet::UpdateWaypoints(const std::vector<Point> &refPoints)
+{
+    this->minCutSolver.GetCuts();
+
+    using std::vector;
+
+    for (size_t lineId = 0; lineId < this->rawLines.size(); lineId ++) {
+        auto & rawLine = this->rawLines[lineId];
+        if (rawLine.empty()) {
+            continue;
+        }
+
+        for (size_t i = 0; i < rawLine.size(); i ++) {
+            Point & point = rawLine[i];
+            if (point.fixed) {
+                point.prevFixedPointId = i;
+            } else {
+                if (i == 0) {
+                    point.prevFixedPointId = -1;
+                } else {
+                    point.prevFixedPointId = rawLine[i - 1].prevFixedPointId;
+                }
+            }
+        }
+        
+        for (size_t i = rawLine.size() - 1; i != (size_t)-1; i --) {
+            Point & point = rawLine[i];
+            if (point.fixed) {
+                point.nextFixedPointId = i;
+            } else {
+                if (i == rawLine.size() - 1) {
+                    point.nextFixedPointId = -1;
+                } else {
+                    point.nextFixedPointId = rawLine[i + 1].nextFixedPointId;
+                }
+            }
+        }
+
+        for (size_t i = 0, j = 0; i < rawLine.size(); i ++) {
+            Point & point = rawLine[i];
+            int x = this->GetGridIndexOfX(point.x);
+            int y = this->GetGridIndexOfY(point.y);
+
+            bool isCut = false;
+            for (; j < gridGraph.trips[lineId].size(); j ++) {
+                int x_ = gridGraph.trips[lineId][j].first;
+                int y_ = gridGraph.trips[lineId][j].second;
+
+                if (minCutSolver.IsCut(x_, y_)) {
+                    isCut = true;
+                }
+
+                if (x_ == x && y_ == y) {
+                    j ++;
+                    break;
+                }
+            }
+
+            if (isCut) {
+                point.fixed = true;
+                const Point prevP = rawLine[point.prevFixedPointId];
+                const Point nextP = rawLine[point.nextFixedPointId];
+
+                Line & line = this->lines[lineId];
+                const size_t oId = line.FindPointIndexById(prevP.id);
+                const size_t dId = line.FindPointIndexById(nextP.id);
+                if (oId != (size_t)-1 && dId != (size_t)-1) {
+                    const Point &rp = refPoints[point.id];
+                    Waypoint wp(rp.x, rp.y, rp.id);
+                    line.AddWaypoint(oId, dId, wp);
+                }
+            }
+        }
+    }
 }
 
 
