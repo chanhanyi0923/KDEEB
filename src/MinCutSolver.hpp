@@ -15,6 +15,7 @@ class MinCutSolver {
   std::vector<bool> result, isRoad, isCut;//, prevIsCut;
   int rowSize, columnSize;
   Grid *grid;
+  GridGraph *gridGraph;
 
   void WriteBack() {
     for (int i = 0; i < rowSize; i++) {
@@ -123,8 +124,8 @@ class MinCutSolver {
   }
 
   void Split() {
-    for (int i = 0; i < rowSize; i++) {
-      for (int j = 0; j < columnSize; j++) {
+    for (size_t i = 0; i < rowSize; i++) {
+      for (size_t j = 0; j < columnSize; j++) {
         const size_t index = i * columnSize + j;
         const size_t indexLeft = (i - 1) * columnSize + j;
         const size_t indexRight = (i + 1) * columnSize + j;
@@ -205,6 +206,7 @@ class MinCutSolver {
 
  public:
   void SetData(GridGraph *gridGraph) {
+    this->gridGraph = gridGraph;
     this->columnSize = gridGraph->GetColumnSize();
     this->rowSize = gridGraph->GetRowSize();
 
@@ -257,5 +259,21 @@ class MinCutSolver {
       // this->prevIsCut[index] = r;
       // return r;
     // }
+  }
+
+  int getDensity(int x0, int y0, int x1, int y1) {
+    if (x0 == x1) {
+      if (y0 < y1) {
+        return std::max(this->gridGraph->GetUpWeight(x0, y0), this->gridGraph->GetDownWeight(x1, y1));
+      } else {
+        return std::max(this->gridGraph->GetDownWeight(x0, y0), this->gridGraph->GetUpWeight(x1, y1));
+      }
+    } else {
+      if (x0 < x1) {
+        return std::max(this->gridGraph->GetRightWeight(x0, y0), this->gridGraph->GetLeftWeight(x1, y1));
+      } else {
+        return std::max(this->gridGraph->GetLeftWeight(x0, y0), this->gridGraph->GetRightWeight(x1, y1));
+      }
+    }
   }
 };

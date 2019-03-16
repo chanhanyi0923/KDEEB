@@ -1,7 +1,6 @@
 #include "Application.h"
 
-#include <time.h>
-
+#include <iostream>
 
 Application::Application()
 {
@@ -107,62 +106,127 @@ void Application::Input(const char * inputFile)
         throw RenderException("Could not open input file");
     }
 
-    input >> this->dataSet;
-/*
-    const int frameSize = 100;
 
-    frames.resize(frameSize);
-    bitset<3000> state[frameSize], zero;
+    // read nodes
+    {
+        char file1[100] = "/home/hanyi/KDEEB/others/new_dataset/Nodes.csv";
+        //sprintf(file1, "/home/hanyi/KDEEB/others/test7/nodes.txt", this->inputPath);
+        fstream nodeIn;
+        nodeIn.open(file1, fstream::in);
+        this->refPoints.resize(500000);
 
-    size_t lineNum = 0;
+        int index;
+        double x, y;
+        std::string str, str2, str3;
+        while (std::getline(nodeIn, str)) {
+            std::stringstream ss(str);
+            {
+                std::getline(ss, str2, ',');
+                std::stringstream ss2(str2);
+                ss2 >> index;
+                index--;
+            }
+            {
+                std::getline(ss, str2, ',');
+                std::stringstream ss2(str2);
+                ss2 >> x;
+            }
+            {
+                std::getline(ss, str2, ',');
+                std::stringstream ss2(str2);
+                ss2 >> y;
+            }
+
+            Point p(x, y, 0);
+            p.fixed = true;
+            p.id = index;
+            this->refPoints[index] = p;
+        }
+        nodeIn.close();
+    }
+
+    this->dataSet.xMin = 30.5968 - 0.05;
+    this->dataSet.yMin = 104.0160 - 0.05;
+    this->dataSet.xMax = 30.7258 + 0.05;
+    this->dataSet.yMax = 104.1605 + 0.05;
+    
+
+    int tripsNum = 0;
+
+    this->dataSet.lines.resize(500000);
+    
+    std::vector<int> indices;
+
     for (string stringLine; getline(input, stringLine); ) {
         stringstream lineBuffer(stringLine);
-        string token;
+        
+        int a, b, c;
+        lineBuffer >> a >> b >> c;
 
-        // split by ','
-        float number[4];
-        for (int i = 0; i < 4; i++) {
-            getline(lineBuffer, token, ',');
-            stringstream buffer(token);
-            buffer >> number[i];
-        }
+        Line & line = dataSet.lines[a - 1];
+        indices.push_back(a - 1);
+        line.AddPoint(this->refPoints[b - 1]);
+        line.AddPoint(this->refPoints[c - 1]);
 
-        Line line;
-        //vector<Record> records;
-        line.AddPoint(Point(number[1], number[0], 1.0f));
-        line.AddPoint(Point(number[3], number[2], 1.0f));
-        this->dataSet.lines.push_back(line);
-
-        for (int i = 0; i < frameSize; i ++) {
-            int in;
-            getline(lineBuffer, token, ',');
-            stringstream buffer(token);
-            buffer >> in;
-            state[i].set(lineNum, (bool)in);
-        }
-        lineNum ++;
+        // {
+        //   const Point &p = this->refPoints[b - 1];
+        //   this->dataSet.xMin = std::min(this->dataSet.xMin, p.x);
+        //   this->dataSet.yMin = std::min(this->dataSet.yMin, p.y);
+        //   this->dataSet.xMax = std::max(this->dataSet.xMax, p.x);
+        //   this->dataSet.yMax = std::max(this->dataSet.yMax, p.y);
+        // }
+        // {
+        //   const Point &p = this->refPoints[c - 1];
+        //   this->dataSet.xMin = std::min(this->dataSet.xMin, p.x);
+        //   this->dataSet.yMin = std::min(this->dataSet.yMin, p.y);
+        //   this->dataSet.xMax = std::max(this->dataSet.xMax, p.x);
+        //   this->dataSet.yMax = std::max(this->dataSet.yMax, p.y);
+        // }
     }
 
-    for (int i = 0; i < frameSize; i ++) {
-        const auto & prev = i == 0 ? zero : state[i - 1];
-        for (int j = 0; j < lineNum; j ++) {
-            if (prev[j] != state[i][j]) {
-                if (state[i][j]) {
-                    this->frames[i].add.push_back(j);
-                } else {
-                    this->frames[i].remove.push_back(j);
-                }
-            }
+    // normalize
+    for (size_t i = 0; i < 500000; i ++) {
+        double x = this->refPoints[i].x;
+        double y = this->refPoints[i].y;
+        x = (x - this->dataSet.xMin) / (this->dataSet.xMax - this->dataSet.xMin);
+        y = (y - this->dataSet.yMin) / (this->dataSet.yMax - this->dataSet.yMin);
+        this->refPoints[i].x = x;
+        this->refPoints[i].y = y;
+    }
+
+    for (size_t i = 0; i < 500000; i ++) {
+        Line & line = this->dataSet.lines[i];
+        for (size_t j = 0; j < line.GetPointSize(); j ++) {
+            Point p = this->refPoints[line.GetPoint(j).id];
+            line.SetPoint(j, p);
         }
     }
-*/
 
-    //
-    //
+
+    fstream output_kdeeb;
+    output_kdeeb.open("/home/hanyi/KDEEB/build/in/more.txt", fstream::in);
+
+    for (string stringLine; getline(output_kdeeb, stringLine); ) {
+        stringstream buffer(stringLine);
+        if (stringLine == "" || stringLine == " ") {
+            continue;
+        }
+
+        int id;
+        double x, y;
+        buffer >> y >> x >> id;
+
+        x = (x - this->dataSet.xMin) / (this->dataSet.xMax - this->dataSet.xMin);
+        y = (y - this->dataSet.yMin) / (this->dataSet.yMax - this->dataSet.yMin);
+
+
+        Point p(x, y, 0);
+        this->dataSet.lines[indices[id - 1]].AddSecondLastPoint(p);
+	}
+
 
     input.close();
 }
-
 
 void Application::Output(const char * outputFile)
 {
@@ -180,60 +244,61 @@ void Application::Output(const char * outputFile)
 
 void Application::Config()
 {
-    std::fstream iterationConf;
-    iterationConf.open("/home/hanyi/KDEEB/others/test7/iteration.conf", std::fstream::in);
-    if (!iterationConf) {
-        throw RenderException("Configuration not found");
-    }
-    for (std::string line; getline(iterationConf, line); ) {
-        std::stringstream buffer(line);
-
-        int count, textureWidth;
-        float kernelSize;
-        double attractionFactor, smoothingFactor;
-        std::string doResamplingString;
-        bool doResampling;
-
-        buffer >> count >> textureWidth >> kernelSize >> attractionFactor >> smoothingFactor >> doResamplingString;
-        if (doResamplingString == "true") {
-            doResampling = true;
-        } else if (doResamplingString == "false") {
-            doResampling = false;
-        } else {
-            throw RenderException("Failed to initialize GLEW");
-        }
-        this->iterationsForNonRealTime.push_back(Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling));
-    }
-    iterationConf.close();
+    int count, textureWidth;
+    float kernelSize;
+    double attractionFactor, smoothingFactor;
+    bool doResampling;
+    int resampleStep;
+  
+    count = 10;
+    textureWidth = 200;
+    kernelSize = 20;
+    attractionFactor = 0.01;
+    smoothingFactor = 0.1;doResampling = true;
+    resampleStep = 1;
+  
+    this->iterationsForNonRealTime.push_back(Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling, resampleStep));
 }
 
 
-void Application::Run(const char * inputFile, const char * outputFile)
+int Application::Run(int layerNum, double maxLng, double minLng, double maxLat, double minLat)
 {
-    this->inputPath = inputFile;
-
-
+    //this->inputPath = inputFile;
 
     clock_t start, end;
     start = clock();
+
+    this->LngRecord = maxLng; this->LatRecord = maxLat;
 
     this->InitOpenGL();
 
     this->Config();
 
+	this->Input("/home/hanyi/KDEEB/build/in/trips.txt");
+
     //this->Input(inputFile);
-    this->Input();
+    //int tripsNum = this->Input(layerNum, maxLng, minLng, maxLat, minLat);
+
+/*
+    if (tripsNum == 0) {
+        this->TerminateOpenGL();
+        return 1;
+    }
+*/
 
     this->NonRealTimeBundleWithWaypoint();
     //this->NonRealTimeBundle();
-    this->Output(outputFile);
-    //this->Output();
+
+    //this->Output("xx");
 
     this->TerminateOpenGL();
 
     end = clock();
     std::cout<< "whole total time: " << (double)(end-start)/CLOCKS_PER_SEC << std::endl;
+
+    return 0;
 }
+
 
 
 void Application::NonRealTimeBundleWithWaypoint()
@@ -244,42 +309,90 @@ void Application::NonRealTimeBundleWithWaypoint()
 
     this->InitBundle();
 
-    this->dataSet.CreateGridGraph();
+    //this->dataSet.CreateGridGraph();
 
     for (int fileNum = 1; fileNum <= 26; fileNum ++) {
+        char filename[100];
+        sprintf(filename, "%swaypoint%d.txt", "/home/hanyi/KDEEB/build/in/", fileNum);
 
-        for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
-            Line & line = this->dataSet.lines[i];
-            if (line.GetPointSize() > 0 && line.id > 1000000) {
-                std::cout << i << std::endl;
-                throw "line id error in Application::NonRealTimeBundleWithWaypoint";
+
+        fstream fin;
+        fin.open(filename, fstream::in);
+        for (string stringLine; getline(fin, stringLine); ) {
+            std::vector<Waypoint> waypoints;
+
+            stringstream stringLineBuffer(stringLine);
+            int lineIndex;
+            stringLineBuffer >> lineIndex;
+
+            Line &line = this->dataSet.lines[lineIndex - 1];
+
+            string remain;
+            getline(stringLineBuffer, remain);
+            stringstream remainBuffer(remain);
+            // 130 76622 98792 186488, 98792 199048 131376, 
+            for (string waypointString; getline(remainBuffer, waypointString, ','); ) {
+                if (waypointString == "" || waypointString == " ") continue;
+                stringstream waypointStringBuffer(waypointString);
+
+                int oId, dId, pointId;
+
+                waypointStringBuffer >> oId >> dId >> pointId;
+                const Point &refPoint = this->refPoints[pointId - 1];
+
+                Waypoint waypoint(refPoint.x, refPoint.y, refPoint.id);
+                waypoint.oId = oId - 1;
+                waypoint.dId = dId - 1;
+                waypoints.push_back(waypoint);
+            }
+
+			line.AddPointsForWaypoint(waypoints);
+            for (const Waypoint & waypoint: waypoints) {
+                
+                const size_t oId = line.FindPointIndexById(waypoint.oId);
+                const size_t dId = line.FindPointIndexById(waypoint.dId);
+
+                line.AddWaypoint(oId, dId, waypoint);
             }
         }
-    this->dataSet.UpdateWaypoints(this->refPoints);
+        fin.close();
+
+        sprintf(filename, "%sroute_%d.txt", "/home/hanyi/KDEEB/build/in/", fileNum);
+
+        fin.open(filename, fstream::in);
+        for (string stringLine; getline(fin, stringLine); ) {
+            stringstream buffer1(stringLine);
+            int lineIndex, oIdInput, dIdInput;
+            buffer1 >> lineIndex >> oIdInput >> dIdInput;
+            lineIndex --;
+
+            Line & line = this->dataSet.lines[lineIndex];
+            if (line.GetPointSize() == 0) continue;
+
+            line.AddSegment(oIdInput - 1, dIdInput - 1);
+        }
+        fin.close();
+
+        //this->dataSet.UpdateWaypoints(this->refPoints);
 
         // bundle
         //#pragma omp parallel for
         for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
             Line & line = this->dataSet.lines[i];
-
-            if (line.GetWaypointSize() == 0) {
-                line = Line();
-            }
-            // std::cout << "Line " << i << std::endl;
             line.UpdatePoints();
         }
 
 
         // Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling))
         //this->BundleWithWaypoint(Iteration(20, 200, 20, 0.001, 0.1, true));
-        this->BundleWithWaypoint(this->iterationsForNonRealTime[0]);
+        this->BundleWithWaypoint(this->iterationsForNonRealTime[0], fileNum);
 
 
         //#pragma omp parallel for
-        for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
-            Line & line = this->dataSet.lines[i];
-            line.ClearWaypoints();
-        }
+        // for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
+        //     Line & line = this->dataSet.lines[i];
+        //     line.ClearWaypoints();
+        // }
 
     }
 }
@@ -292,35 +405,6 @@ void Application::NonRealTimeBundle()
         this->Bundle(iteration);
     }
 }
-
-/*
-void Application::RealTimeBundle()
-{
-    this->InitBundle();
-    DataSet * originalDataSet = new DataSet(this->dataSet);
-
-    for (size_t i = 0; i < this->frames.size(); i ++) {
-        std::cout << i << std::endl;
-        const auto & frame = this->frames[i];
-
-        for (const size_t index: frame.add) {
-            this->dataSet.data[index] = originalDataSet->data[index];
-        }
-        for (const size_t index: frame.remove) {
-            this->dataSet.data[index].clear();
-        }
-        // Iteration(count, textureWidth, kernelSize, attractionFactor, smoothingFactor, doResampling))
-        this->Bundle(Iteration(10, 100, 20, 0.1, 0.1, true));
-
-        // for debug
-        std::stringstream buffer;
-        buffer << "realtime_" << i;
-        this->Output(buffer.str().c_str());
-        //
-    }
-    delete originalDataSet;
-}
-*/
 
 void Application::InitBundle()
 {
@@ -354,22 +438,20 @@ void Application::Bundle(const Iteration & iteration)
         this->gradient.ApplyGradient(this->dataSet);
 
         this->dataSet.SmoothTrails(iteration.smoothingFactor);
-        if (iteration.doResampling) {
-            this->dataSet.AddRemovePoints(this->pointRemoveDistance, this->pointSplitDistant);
-        }
+        
+    }
+	if (iteration.doResampling) {
+        this->dataSet.AddRemovePoints(this->pointRemoveDistance, this->pointSplitDistant);
     }
 }
 
 
-// just for test
-// extern int num;
 
-void Application::BundleWithWaypoint(const Iteration & iteration)
+
+
+void Application::BundleWithWaypoint(const Iteration & iteration, int layerNum)
 {
-    static int c = 0;
-
-
-
+    int c = 10 * (layerNum - 1);
 
     const uint32_t textureWidth = iteration.textureWidth;
 
@@ -387,24 +469,68 @@ void Application::BundleWithWaypoint(const Iteration & iteration)
         std::vector<float> accD = framebuffer.ComputeSplatting(iteration.kernelSize, image);
         this->gradient.SetAccMap(&accD);
         this->gradient.ApplyGradientWithWaypoint(this->dataSet, i);
-        this->dataSet.SmoothTrailsWithWaypoint(iteration.smoothingFactor);
-        if (iteration.doResampling) {
-            this->dataSet.AddRemovePointsWithWaypoint(this->pointRemoveDistance, this->pointSplitDistant);
+
+        // if (i == iteration.count - 1) {
+        //     for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
+        //         Line & line = this->dataSet.lines[i];
+        //         line.SetWaypointToFixed();
+        //     }
+        // }
+        
+        if (i % iteration.resampleStep == 0 || i == iteration.count - 1) {
+          this->dataSet.SmoothTrailsWithWaypoint(iteration.smoothingFactor);
+          this->dataSet.AddRemovePointsWithWaypoint(this->pointRemoveDistance, this->pointSplitDistant);
         }
+
 
         if (i == iteration.count - 1) {
             this->dataSet.RemovePointsInSegment();
         }
-        //
+
+
 
         char s[100];
-        sprintf(s, "/home/hanyi/KDEEB/build/out/%d.txt", c);
+        sprintf(s, "/home/hanyi/KDEEB/build/out/%.3f_%.3f_%d.csv", this->LngRecord, this->LatRecord, c);
         this->Output(s);
-        //num = c;
-        c ++;
-        //
-    }
+        std::cout << "iter num: " << c << std::endl;
 
+		// {
+		// 	size_t emptyCount = 0;
+		// 	for (size_t i = 0; i < this->dataSet.lines.size(); i ++) {
+		// 		const Line & line = this->dataSet.lines[i];
+		// 		if (line.GetPointSize() == 0) {
+		// 			emptyCount ++;
+		// 		}
+		// 	}
+		// 	std::cout << (500000 - emptyCount) << std::endl;
+		// }
+
+        //std::stringstream ss1, ss2; std::string lng, lat;
+        //ss1 << std::fixed << std::setprecision(3) << this->LngRecord; ss1 >> lng;
+        //ss2 << std::fixed << std::setprecision(3) << this->LatRecord; ss2 >> lat;
+        //std::string command = "/home/yanlyu/Downloads/miniconda3/envs/py3/bin/python linesformatTojson.py "+lng+"_"+lat+"_"+std::to_string(c)+"";
+        //int res = system(command.c_str());
+        //std::cout << "iter num: " << c << " python script status: " << res << std::endl;
+
+        //std::thread t(loadOutputToDB, c, this->LngRecord, this->LatRecord);
+        //t.detach();
+
+        c ++;
+    }
 }
 
+
+// void loadOutputToDB(int iterNum, double LngRecord, double LatRecord) 
+// {
+//         std::this_thread::sleep_for(std::chrono::milliseconds((iterNum+1)%21*100));
+
+//         // call python script
+//         std::stringstream ss1, ss2; std::string lng, lat;
+//         ss1 << std::fixed << std::setprecision(3) << LngRecord; ss1 >> lng;
+//         ss2 << std::fixed << std::setprecision(3) << LatRecord; ss2 >> lat;
+//         std::string command = "/home/yanlyu/Downloads/miniconda3/envs/py3/bin/python linesformatTojson.py "+lng+"_"+lat+"_"+std::to_string(iterNum)+"";
+
+//         std::cout<< command << std::endl;
+//         int res = system(command.c_str());
+// }
 

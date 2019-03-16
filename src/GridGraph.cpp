@@ -23,8 +23,8 @@ void GridGraph::SetGridSize(size_t rowSize, size_t columnSize) {
 
 void GridGraph::SetTripSize(size_t tripSize) { this->trips.resize(tripSize); }
 
-void GridGraph::AddPoint(size_t tripId, size_t x, size_t y) {
-  this->trips[tripId].push_back(std::make_pair(x, y));
+void GridGraph::AddPoint(size_t tripId, size_t x, size_t y, size_t pointId) {
+  this->trips[tripId].push_back(GridPoint(x, y, pointId));
 }
 
 std::vector<std::pair<int, int> > GridGraph::DrawLine(int x0, int y0, int x1,
@@ -74,22 +74,26 @@ std::vector<std::pair<int, int> > GridGraph::DrawLine(int x0, int y0, int x1,
   return result;
 }
 
-void GridGraph::ExpandGridTrip(std::vector<std::pair<int, int> > &trip) {
-  std::vector<std::pair<int, int> > result;
+void GridGraph::ExpandGridTrip(std::vector< GridPoint > &trip) {
+  std::vector<GridPoint> result;
 
   for (size_t i = 1; i < trip.size(); i++) {
     const auto &pointOne = trip[i - 1];
     const auto &pointTwo = trip[i];
 
-    const size_t pointOneX = pointOne.first;
-    const size_t pointOneY = pointOne.second;
-    const size_t pointTwoX = pointTwo.first;
-    const size_t pointTwoY = pointTwo.second;
+    const auto &piiLine =
+        this->DrawLine(pointOne.x, pointOne.y, pointTwo.x, pointTwo.y);
 
-    const auto &line =
-        this->DrawLine(pointOneX, pointOneY, pointTwoX, pointTwoY);
-    for (size_t j = 0; j < line.size(); j++) {
-      result.push_back(line[j]);
+    if (result.size() > 1 &&
+        result.back().x != piiLine.front().first /* .x */ &&
+        result.back().y != piiLine.front().second /* .y */) {
+        result.push_back(GridPoint(result.back().x, piiLine.front().second /* .y */, result.back().pointId));
+    }
+    for (size_t j = 0; j < piiLine.size() / 2; j++) {
+      result.push_back(GridPoint(piiLine[j].first, piiLine[j].second, pointOne.pointId));
+    }
+    for (size_t j = piiLine.size() / 2; j < piiLine.size(); j++) {
+      result.push_back(GridPoint(piiLine[j].first, piiLine[j].second, pointTwo.pointId));
     }
   }
   trip = result;
@@ -102,10 +106,10 @@ void GridGraph::ReverseTrips() {
     if (trip.empty()) {
       continue;
     }
-    int sx = trip.front().first;
-    int sy = trip.front().second;
-    int tx = trip.back().first;
-    int ty = trip.back().second;
+    int sx = trip.front().x;
+    int sy = trip.front().y;
+    int tx = trip.back().x;
+    int ty = trip.back().y;
 
     OdPair st(std::make_pair(sx, sy), std::make_pair(tx, ty));
     OdPair ts(std::make_pair(tx, ty), std::make_pair(sx, sy));
@@ -125,10 +129,10 @@ void GridGraph::GetCapacity() {
     }
 
     for (size_t j = 1; j < trip.size(); j++) {
-      int x0 = trip[j - 1].first;
-      int y0 = trip[j - 1].second;
-      int x1 = trip[j].first;
-      int y1 = trip[j].second;
+      int x0 = trip[j - 1].x;
+      int y0 = trip[j - 1].y;
+      int x1 = trip[j].x;
+      int y1 = trip[j].y;
       Grid &g = grid[x0][y0];
 
       if (x0 != x1 && y0 != y1) {
@@ -151,14 +155,14 @@ void GridGraph::GetCapacity() {
         }
       }
     }
-    grid[trip.front().first][trip.front().second].isSource = true;
-    grid[trip.back().first][trip.back().second].isSink = true;
+    grid[trip.front().x][trip.front().y].isSource = true;
+    grid[trip.back().x][trip.back().y].isSink = true;
   }
 }
 
 void GridGraph::RemoveOverlap() {
-  for (int i = 0; i < this->rowSize; i++) {
-    for (int j = 0; j < this->columnSize; j++) {
+  for (size_t i = 0; i < this->rowSize; i++) {
+    for (size_t j = 0; j < this->columnSize; j++) {
       Grid &g = grid[i][j];
       if (g.isSource && g.isSink) {
         overlap[i][j] = true;
@@ -233,3 +237,11 @@ int GridGraph::GetSinkCapacity(int x, int y) {
     return this->FlowToCapacity(grid[x][y].isSink ? 1 : 0);
   }
 }
+
+
+int GridGraph::GetLeftWeight(int x, int y) { return grid[x][y].left; }
+int GridGraph::GetRightWeight(int x, int y) { return grid[x][y].right; }
+int GridGraph::GetDownWeight(int x, int y) { return grid[x][y].down; }
+int GridGraph::GetUpWeight(int x, int y) { return grid[x][y].up; }
+
+

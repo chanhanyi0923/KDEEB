@@ -1,5 +1,6 @@
 #include "DataSet.h"
 
+#include <fstream>
 
 DataSet::DataSet()
 {
@@ -62,6 +63,7 @@ std::istream & operator >> (std::istream & input, DataSet & dataSet)
 }
 
 
+/*
 std::ostream & operator << (std::ostream & output, const DataSet & dataSet)
 {
     output << std::setprecision(15);
@@ -76,113 +78,243 @@ std::ostream & operator << (std::ostream & output, const DataSet & dataSet)
 
     return output;
 }
+*/
 
-#define GRID_WIDTH 0.0003
+std::ostream & operator << (std::ostream & output, const DataSet & dataSet)
+{
+  //output << "line_id,omnisci_geo" << std::endl;
+
+  for (size_t i = 0; i < dataSet.lines.size(); i ++) {
+    const Line & line = dataSet.lines[i];
+    if (line.GetPointSize() == 0) {
+	  continue;
+	}
+    std::string strLine = "LINESTRING(";
+
+    for (size_t j = 0; j < line.GetPointSize(); j ++) {
+      const Point & point = line.GetPoint(j);
+      double x = point.x * (dataSet.xMax - dataSet.xMin) + dataSet.xMin;
+      double y = point.y * (dataSet.yMax - dataSet.yMin) + dataSet.yMin;
+      
+      std::stringstream bufferX, bufferY;
+      bufferX << std::setprecision(15) << x;
+      bufferY << std::setprecision(15) << y;
+      strLine += bufferY.str() + " " + bufferX.str() + ",";
+    }
+    strLine.pop_back();
+    strLine += ")";
+    output << (i + 1) << ";" << strLine << std::endl;
+  }
+  output << std::resetiosflags(std::ios::showbase);
+
+  return output;
+}
+
+
+
 size_t DataSet::GetGridIndexOfX(double x)
 {
-	return floor( (x - this->xMin + 0.5 * GRID_WIDTH) / GRID_WIDTH );
+	return floor( (x - this->xMin + 0.5 * this->gridWidth) / this->gridWidth );
 }
 
 
 size_t DataSet::GetGridIndexOfY(double y)
 {
-	return floor( (y - this->yMin + 0.5 * GRID_WIDTH) / GRID_WIDTH );
+	return floor( (y - this->yMin + 0.5 * this->gridWidth) / this->gridWidth );
 }
 
 
 void DataSet::CreateGridGraph()
 {
-    gridGraph.SetTripSize(500000);
-    gridGraph.SetMaxFlow(500000);
-	size_t x_num = 1 + ceil( (this->xMax - this->xMin + GRID_WIDTH) / GRID_WIDTH );
-	size_t y_num = 1 + ceil( (this->yMax - this->yMin + GRID_WIDTH) / GRID_WIDTH );
-    gridGraph.SetGridSize(x_num, y_num);
-    for (int i = 0; i < 500000; i ++) {
-        for (const Point & p: rawLines[i]) {
-            int x = GetGridIndexOfX(p.x);
-            int y = GetGridIndexOfY(p.y);
-            gridGraph.AddPoint(i, x, y);
-        }
+  gridGraph.SetTripSize(500000);
+  gridGraph.SetMaxFlow(500000);
+  size_t x_num = 1 + ceil( (this->xMax - this->xMin + this->gridWidth) / this->gridWidth );
+  size_t y_num = 1 + ceil( (this->yMax - this->yMin + this->gridWidth) / this->gridWidth );
+  gridGraph.SetGridSize(x_num, y_num);
+  for (int i = 0; i < 500000; i ++) {
+    for (const Point & p: rawLines[i]) {
+      int x = GetGridIndexOfX(p.x);
+      int y = GetGridIndexOfY(p.y);
+      gridGraph.AddPoint(i, x, y, p.id);
     }
-    gridGraph.ConvertToGrid();
-    this->minCutSolver.SetData(&this->gridGraph);
+  }
+  gridGraph.ConvertToGrid();
+  this->minCutSolver.SetData(&this->gridGraph);
 }
 
 
-void DataSet::UpdateWaypoints(const std::vector<Point> &refPoints)
+// for debug
+static int level = 0;
+
+bool DataSet::UpdateWaypoints(const std::vector<Point> &refPoints)
 {
-    this->minCutSolver.GetCuts();
+  using std::vector;
 
-    using std::vector;
+  using std::fstream;
+  fstream ftest;
 
-    for (size_t lineId = 0; lineId < this->rawLines.size(); lineId ++) {
-        auto & rawLine = this->rawLines[lineId];
-        if (rawLine.empty()) {
-            continue;
+  level ++;
+  std::stringstream ss;
+  ss << "waypoints_" << level;
+  ftest.open( ss.str().c_str(), fstream::out );
+
+  bool add = false, failTag = false;
+
+  this->minCutSolver.GetCuts();
+  for (size_t lineId = 0; lineId < this->rawLines.size(); lineId ++) {
+    auto & segments = this->roadSegments[lineId];
+    auto & rawLine = this->rawLines[lineId];
+    auto & line = this->lines[lineId];
+    std::vector<RoadSegment> nextSegment;
+    std::vector<Waypoint> waypoints;
+    const size_t lineLength = rawLine.size();
+
+    if (rawLine.empty()) {
+      continue;
+    }
+
+    std::map<size_t, size_t> reverseTable;
+    for (size_t i = 0; i < lineLength; i ++) {
+      const auto & point = rawLine[i];
+      reverseTable[point.id] = i;
+    }
+
+    // get cuts
+    std::set<size_t> cutsPointId;
+    for (size_t j = 0; j < gridGraph.trips[lineId].size(); j ++) {
+      const auto & p = gridGraph.trips[lineId][j];
+      if (minCutSolver.IsCut(p.x, p.y)) {
+        cutsPointId.insert(p.pointId);
+      }
+    }
+
+    // to split empty interval (no added waypoint)
+    // state[i] records point rawLine[i] is
+    //     empty: not waypoint, existed: existed waypoint, add: to be added waypoint
+    enum State { empty, existed, added };
+    std::vector<State> states;
+    states.resize(lineLength, State::empty);
+
+    for (size_t i = 0; i < lineLength; i ++) {
+      auto & point = rawLine[i];
+      if (point.fixed) {
+        states[i] = State::existed;
+      }
+    }
+
+    {
+      Point prevPoint(0, 0, 0);
+      for (const auto & pointId: cutsPointId) {
+        const size_t index = reverseTable[pointId];
+        auto & point = rawLine[index];
+
+        double dist = (prevPoint.x - point.x) * (prevPoint.x - point.x) +
+            (prevPoint.y - point.y) * (prevPoint.y - point.y);
+
+        if (!point.fixed && dist > 0.00003) {
+          point.fixed = true;
+          states[index] = State::added;
+        }
+        prevPoint = point;
+      }
+    }
+
+    for (int i = 1, lastExisted = 0, lastAdded = -1; i < lineLength; i ++) {
+      State &state = states[i];
+      if (state == State::existed && lastAdded < lastExisted) {
+        if (i == lastExisted + 1) {
+          const size_t oId = rawLine[i - 1].id;
+          const size_t dId = rawLine[i].id;
+          const size_t density = 1;
+          nextSegment.push_back(RoadSegment(oId, dId, density));
+        } else {
+          const size_t mid = (i + lastExisted) / 2;
+          states[mid] = State::added;
+          rawLine[mid].fixed = true;
+        }
+      }
+
+      if (state == State::existed) {
+        lastExisted = i;
+      } else if (state == State::added) {
+        lastAdded = i;
+      }
+    }
+
+    // find previous and next waypoint of every point
+    vector<size_t> prevWaypointId, nextWaypointId;
+    prevWaypointId.resize(lineLength);
+    nextWaypointId.resize(lineLength);
+
+    for (int i = 0; i < lineLength; i ++) {
+      State &state = states[i];
+      if (i == 0 || state == State::existed) {
+        prevWaypointId[i] = i;
+      } else {
+        prevWaypointId[i] = prevWaypointId[i - 1];
+      }
+    }
+    for (int i = lineLength - 1; i >= 0; i --) {
+      State &state = states[i];
+      if (i == lineLength - 1 || state == State::existed) {
+        nextWaypointId[i] = i;
+      } else {
+        nextWaypointId[i] = nextWaypointId[i + 1];
+      }
+    }
+
+    for (int i = 0; i < lineLength; i ++) {
+      const State &state = states[i];
+      if (state == State::added) {
+        add = true;
+
+        const Point &point = refPoints[rawLine[i].id];
+        Waypoint waypoint(point.x, point.y, point.id);
+        waypoint.oId = rawLine[ prevWaypointId[i] ].id;
+        waypoint.dId = rawLine[ nextWaypointId[i] ].id;
+        waypoints.push_back(waypoint);
+      }
+    }
+
+    line.AddPointsForWaypoint(waypoints);
+
+    for (const auto & waypoint: waypoints) {
+        const size_t oId = line.FindPointIndexById(waypoint.oId);
+        const size_t dId = line.FindPointIndexById(waypoint.dId);
+
+        if (oId == (size_t)-1 || dId == (size_t)-1) {
+          failTag = true;
+          goto fail;
+        }
+        try {
+          line.AddWaypoint(oId, dId, waypoint);
+        } catch (...) {
+          failTag = true;
+          goto fail;
         }
 
-        for (size_t i = 0; i < rawLine.size(); i ++) {
-            Point & point = rawLine[i];
-            if (point.fixed) {
-                point.prevFixedPointId = i;
-            } else {
-                if (i == 0) {
-                    point.prevFixedPointId = -1;
-                } else {
-                    point.prevFixedPointId = rawLine[i - 1].prevFixedPointId;
-                }
-            }
-        }
-        
-        for (size_t i = rawLine.size() - 1; i != (size_t)-1; i --) {
-            Point & point = rawLine[i];
-            if (point.fixed) {
-                point.nextFixedPointId = i;
-            } else {
-                if (i == rawLine.size() - 1) {
-                    point.nextFixedPointId = -1;
-                } else {
-                    point.nextFixedPointId = rawLine[i + 1].nextFixedPointId;
-                }
-            }
-        }
-
-        for (size_t i = 0, j = 0; i < rawLine.size(); i ++) {
-            Point & point = rawLine[i];
-            int x = this->GetGridIndexOfX(point.x);
-            int y = this->GetGridIndexOfY(point.y);
-
-            bool isCut = false;
-            for (; j < gridGraph.trips[lineId].size(); j ++) {
-                int x_ = gridGraph.trips[lineId][j].first;
-                int y_ = gridGraph.trips[lineId][j].second;
-
-                if (minCutSolver.IsCut(x_, y_)) {
-                    isCut = true;
-                }
-
-                if (x_ == x && y_ == y) {
-                    j ++;
-                    break;
-                }
-            }
-
-            if (isCut) {
-                point.fixed = true;
-                const Point prevP = rawLine[point.prevFixedPointId];
-                const Point nextP = rawLine[point.nextFixedPointId];
-
-                Line & line = this->lines[lineId];
-                const size_t oId = line.FindPointIndexById(prevP.id);
-                const size_t dId = line.FindPointIndexById(nextP.id);
-                if (oId != (size_t)-1 && dId != (size_t)-1) {
-                    const Point &rp = refPoints[point.id];
-                    Waypoint wp(rp.x, rp.y, rp.id);
-                    line.AddWaypoint(oId, dId, wp);
-                }
-            }
+        {
+          const double waypointX = waypoint.x * (this->xMax - this->xMin) + this->xMin;
+          const double waypointY = waypoint.y * (this->yMax - this->yMin) + this->yMin;
+          ftest << (int)(oId) << " " << (int)(dId) << " " << waypointX << " " << waypointY << ",";
         }
     }
+
+    for (const auto & segment: segments) {
+      line.AddSegment(segment.oId, segment.dId);
+    }
+    segments = nextSegment;
+
+    fail:
+    if (failTag) {
+      line = Line();
+    }
+
+	ftest << std::endl;
+  }
+  ftest.close();
+
+  return add;
 }
 
 
@@ -250,11 +382,8 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
 
     #pragma omp parallel for
     for (size_t i = 0; i < this->lines.size(); i ++) {
-        const Line & line = this->lines[i];
-
-        try {
-
-        if (line.GetPointSize() >= 2) {
+        Line & line = this->lines[i];
+        if (line.GetPointSize() >= 2 && !line.static_) {
             Line source;
 
             Point prevPoint = line.GetFirstPoint();
@@ -267,7 +396,7 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
                                     (prevPoint.y - point.y) * (prevPoint.y - point.y);
 
                 bool keepPoint = false;
-                if (dist > splitDist2 && !(prevPoint.isSegment && point.isSegment) ) {
+                if (dist > splitDist2 && !(prevPoint.isSegment && point.isSegment)) {
                     Point newPoint(
                         (prevPoint.x + point.x) / 2.0,
                         (prevPoint.y + point.y) / 2.0,
@@ -289,13 +418,17 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
                     keepPoint = true;
                 } else if (point.fixed) {
                     keepPoint = true;
+                } else if (point.preparedWaypoint) {
+                    keepPoint = true;
                 } else if (point.waypointId != (size_t)-1) {
-                    Waypoint waypoint = line.GetWaypointFromPointId(j);
+                    const size_t waypointId = point.waypointId;
+                    Waypoint waypoint = line.GetWaypoint(waypointId);
 
                     if (j == waypoint.closestPointId) {
                         keepPoint = true;
                         // update closest point
                         waypoint.closestPointId = source.GetPointSize();
+                        line.SetWaypoint(waypointId, waypoint);
                     }
                 }
 
@@ -321,13 +454,9 @@ void DataSet::AddRemovePointsWithWaypoint(double removeDist, double splitDist)
 
             source.id = line.id;
             source.segments = line.segments;
-            source.AddWaypoints(line);
+            source.UpdateWaypointInfo(line);
             source.UpdatePoints();
             this->lines[i] = source;
-        }
-
-        } catch (...) {
-            this->lines[i] = Line();
         }
     }
 }
@@ -401,7 +530,7 @@ void DataSet::SmoothTrailsWithWaypoint(const double interp)
         Line & line = this->lines[_];
         const size_t lineSize = line.GetPointSize();
 
-        if (lineSize >= 2) {
+        if (lineSize >= 2 && !line.static_) {
             vector< pair<float, float> > smoothedPoints(lineSize);
 
             for (size_t i = 1; i < lineSize - 1; i ++) {
@@ -423,9 +552,9 @@ void DataSet::SmoothTrailsWithWaypoint(const double interp)
 
                     if (closestPointId == (size_t)-1) {
                         // need to be changed
-                        std::cout << " " << std::endl;
+                        // std::cout << " " << std::endl;
 
-                        std::cout << closestPointId << std::endl;
+                        // std::cout << closestPointId << std::endl;
                         throw "!";
                     }
 
@@ -493,10 +622,9 @@ void DataSet::RemovePointsInSegment()
     #pragma omp parallel for
     for (size_t i = 0; i < this->lines.size(); i ++) {
         Line & line = this->lines[i];
-        try {
+        if (line.GetPointSize() > 0) {
             line.RemovePointsInSegment();
-        } catch (...) {
-            line = Line();
+            line.ClearWaypoints();
         }
     }
 }

@@ -28,6 +28,7 @@ public:
     // size_t: id, id is the index in database, not in this line
     std::set< std::pair<size_t, size_t> > segments;
 
+    bool static_;
 
     //debug
     size_t id;
@@ -57,7 +58,7 @@ public:
 
 
     void AddWaypoint(const size_t oId, const size_t dId, Waypoint waypoint);
-    void AddWaypoints(const Line & line);
+    //void AddWaypoints(const Line & line);
     void UpdatePoints();
     Waypoint GetWaypointFromPointId(const size_t index) const;
     Waypoint GetWaypoint(const size_t index) const;
@@ -66,7 +67,15 @@ public:
     void ClearWaypoints();
     void RemovePointsInSegment();
 
+    //void SplitByWaypoints();
+    void UpdateWaypointInfo(const Line & line);
+    //void SetWaypointToFixed();
+    void AddPointsForWaypoint(const std::vector<Waypoint> & waypoints);
+
     // for debug
     bool checkPoints();
+
+
+    void PrintFixedPoints();
 };
 

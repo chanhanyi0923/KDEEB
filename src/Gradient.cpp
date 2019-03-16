@@ -171,7 +171,7 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
     #pragma omp parallel for
     for (size_t i = 0; i < dataSet.lines.size(); i ++) {
         Line & line = dataSet.lines[i];
-        if (line.GetPointSize() >= 2) {
+        if (line.GetPointSize() >= 2 && !line.static_) {
             for (size_t j = 0; j < line.GetPointSize(); j++) {
                 Point point = line.GetPoint(j);
                 point.z = this->GetAccMapValue(point.x, point.y);
@@ -194,15 +194,25 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
                             scale = 1.0;
                             forward = dvec2(waypoint.x - point.x, waypoint.y - point.y);
                             // closest point must reach it's waypoint at last step
-                            if (stepNum == this->steps.GetSize() - 1) {
+
+
+                            if (stepNum == this->steps.GetSize() - 1 && point.preparedWaypoint) {
                                 point.id = waypoint.id;
                                 point.fixed = true;
+                                // point.preparedWaypoint = false;
                             }
                         }
+                        
+                        // if (point.preparedWaypoint && stepNum == this->steps.GetSize() - 1) {
+                        //     point.id = waypoint.id;
+                        //     point.fixed = true;
+                        //     point.preparedWaypoint = false;
+                        // }
                     //} else {
                     //   scale = 1.0;
                     //}
 
+					try {
                     if (!isClosest) {
                         const Point & prevPoint = line.GetPoint(point.prevFixedPointId);
                         const Point & nextPoint = line.GetPoint(point.nextFixedPointId);
@@ -216,7 +226,7 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
 */
                         dvec2 w1, w2;
                         size_t id1, id2;
-                        if (prevPoint.waypointId != (size_t)-1) {
+                        if (!prevPoint.fixed && prevPoint.waypointId != (size_t)-1) {
                             const Waypoint & prevWaypoint = line.GetWaypoint(prevPoint.waypointId);
                             w1 = dvec2(prevWaypoint.x, prevWaypoint.y);
                             id1 = prevWaypoint.id;
@@ -225,7 +235,7 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
                             id1 = prevPoint.id;
                         }
 
-                        if (nextPoint.waypointId != (size_t)-1) {
+                        if (!nextPoint.fixed && nextPoint.waypointId != (size_t)-1) {
                             const Waypoint & nextWaypoint = line.GetWaypoint(nextPoint.waypointId);
                             w2 = dvec2(nextWaypoint.x, nextWaypoint.y);
                             id2 = nextWaypoint.id;
@@ -240,8 +250,13 @@ void Gradient::ApplyGradientWithWaypoint(DataSet & dataSet, const size_t stepNum
                             scale = 1.0;
                         }
                     }
+					} catch (...) {
+						scale = 1.0;
+                        forward = dvec2(waypoint.x - point.x, waypoint.y - point.y);
+					}
 
 
+					//scale = 1.0;
                     dvec2 newPoint = dvec2(point.x, point.y) - (1.0 - scale) * gradVec + (scale * stepSize) * forward;
 
                     if (newPoint.x < 0.0 || newPoint.x > 1.0 || newPoint.y < 0.0 || newPoint.y > 1.0) {

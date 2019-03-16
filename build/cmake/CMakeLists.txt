@@ -15,7 +15,7 @@ endif()
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 
 add_executable(
-    main
+    run
 
     ${SRC_DIR}/Main.cpp
     ${SRC_DIR}/Application.cpp
@@ -37,7 +37,7 @@ add_executable(
 )
 
 set_target_properties(
-    main
+    run
     PROPERTIES
 
     CXX_STANDARD 11
@@ -52,7 +52,7 @@ set(COMMON_OPTIONS "-Wall -Wextra -Wno-reorder")
 
 
 target_compile_options(
-    main
+    run
     PRIVATE
     -g -Wall -Wextra -Wno-reorder
     #-O3 -fopenmp -Wall -Wextra -Wno-reorder
@@ -66,8 +66,13 @@ target_compile_options(
 
 
 target_link_libraries(
-    main
+    run
     PRIVATE
     -L/usr/lib/nvidia-410 -lOpenGL -lEGL
+    -L/usr/local/lib
+    -lthrift
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../lib/mapd/libmapd_sample_thrift.a
+    -lpistache
+    -lpthread
 )
 

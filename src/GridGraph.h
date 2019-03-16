@@ -13,6 +13,12 @@ class GridGraph {
         : left(0), right(0), up(0), down(0), isSource(false), isSink(false) {}
   };
 
+  class GridPoint {
+    public:
+      size_t x, y, pointId;
+    GridPoint(size_t x, size_t y, size_t pointId): x(x), y(y), pointId(pointId) {}
+  };
+
   int maxFlow;
   size_t rowSize, columnSize;
 
@@ -25,10 +31,11 @@ class GridGraph {
   void GetCapacity();
   void RemoveOverlap();
   int FlowToCapacity(int flow);
-  void ExpandGridTrip(std::vector<std::pair<int, int> > &trip);
+  
+  void ExpandGridTrip(std::vector< GridPoint > &trip);
 
  public:
-  std::vector<std::vector<std::pair<int, int> > > trips;
+  std::vector<std::vector< GridPoint > > trips;
   std::vector<std::vector<Grid> > grid;
 
   size_t GetRowSize();
@@ -36,7 +43,7 @@ class GridGraph {
   void SetMaxFlow(int maxFlow);
   void SetGridSize(size_t rowSize, size_t columnSize);
   void SetTripSize(size_t tripSize);
-  void AddPoint(size_t tripId, size_t x, size_t y);
+  void AddPoint(size_t tripId, size_t x, size_t y, size_t pointId);
 
   void ConvertToGrid();
   int GetLeftCapacity(int x, int y);
@@ -45,4 +52,9 @@ class GridGraph {
   int GetUpCapacity(int x, int y);
   int GetSourceCapacity(int x, int y);
   int GetSinkCapacity(int x, int y);
+
+  int GetLeftWeight(int x, int y);
+  int GetRightWeight(int x, int y);
+  int GetDownWeight(int x, int y);
+  int GetUpWeight(int x, int y);
 };

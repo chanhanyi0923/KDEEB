@@ -6,7 +6,8 @@
 #include <limits>
 #include <cmath>
 
-Line::Line()
+Line::Line():
+    static_(false)
 {
 }
 
@@ -118,6 +119,10 @@ void Line::ClearWaypoints()
     this->waypoints.clear();
     this->intervals.clear();
     this->segments.clear();
+
+    for (Point & point : this->points) {
+        point.preparedWaypoint = false;
+    }
 }
 
 
@@ -146,7 +151,7 @@ size_t Line::FindPointIndexById(const size_t id) const
         std::cout << "line id: " << this->id << std::endl;
         //std::cout << fixedNum << std::endl;
 */
-        std::cout << "line id: " << this->id << std::endl;
+        //std::cout << "line id: " << this->id << std::endl;
 
         //throw "index = -1";
     }
@@ -210,14 +215,14 @@ void Line::AddWaypoint(const size_t oId_, const size_t dId_, Waypoint waypoint)
     waypoint.dId = dId;
 
     Interval & interval = this->intervals[ std::make_pair(waypoint.oId, waypoint.dId) ];
+    interval.lowerBound = 0;
 
-    if (this->GetPointSize() == 2) {
-        // id = null
-        waypoint.closestPointId = std::numeric_limits<size_t>::max();
-
-        const double dx = (this->GetFirstPoint().x + this->GetLastPoint().x) / 2.0 - waypoint.x;
-        const double dy = (this->GetFirstPoint().y + this->GetLastPoint().y) / 2.0 - waypoint.x;
-        waypoint.minDist = std::sqrt(dx * dx + dy * dy);
+    if (this->GetPointSize() <= 2) {
+        this->points.clear();
+        this->waypoints.clear();
+        this->intervals.clear();
+        this->segments.clear();
+        //throw "number of points in line is too few";
     } else if (this->GetPointSize() > 2) {
         double minDist2 = std::numeric_limits<double>::infinity();
 
@@ -227,7 +232,7 @@ void Line::AddWaypoint(const size_t oId_, const size_t dId_, Waypoint waypoint)
             const Point & point = this->GetPoint(i);
 
             // skip fixed points
-            if (point.fixed) {
+            if (point.fixed || point.preparedWaypoint) {
                 continue;
             }
 
@@ -243,14 +248,26 @@ void Line::AddWaypoint(const size_t oId_, const size_t dId_, Waypoint waypoint)
     }
 
     this->waypoints.push_back(waypoint);
-    interval.waypointIds.push_back(this->waypoints.size() - 1);
+    const size_t waypointId = this->waypoints.size() - 1;
+
+    if (waypoint.closestPointId != (size_t)-1) {
+        const size_t pointId = waypoint.closestPointId;
+        Point point = this->GetPoint(pointId);
+        point.preparedWaypoint = true;
+        point.waypointId = waypointId;
+        this->SetPoint(pointId, point);
+    } else {
+        throw "number of points in line is too few";
+    }
+
+    interval.waypointIds.push_back(waypointId);
 }
 
 
-void Line::AddWaypoints(const Line & line)
+void Line::UpdateWaypointInfo(const Line & line)
 {
-    this->waypoints.clear();
-    for (const auto & waypoint: line.waypoints) {
+    this->waypoints = line.waypoints;
+    for (Waypoint & waypoint: this->waypoints) {
         // do not use waypoint.oId, waypoint.dId, since they are not updated
         const Point & o = line.GetPoint(waypoint.oId);
         const Point & d = line.GetPoint(waypoint.dId);
@@ -258,137 +275,111 @@ void Line::AddWaypoints(const Line & line)
         // this is the real index in current line
         const size_t oId = this->FindPointIndexById(o.id);
         const size_t dId = this->FindPointIndexById(d.id);
-        this->AddWaypoint(oId, dId, waypoint);
+
+        waypoint.oId = oId;
+        waypoint.dId = dId;
+
+
+        const size_t pointId = waypoint.closestPointId;
+        const Point & closestPoint = this->points[pointId];
+        waypoint.minDist = std::sqrt(
+            (closestPoint.x - waypoint.x) * (closestPoint.x - waypoint.x) +
+            (closestPoint.y - waypoint.y) * (closestPoint.y - waypoint.y)
+        );
     }
 }
 
-
 void Line::UpdatePoints()
 {
+    if (this->waypoints.empty()) {
+        this->static_ = true;
+        return;
+    } else {
+        this->static_ = false;
+    }
+
+    std::vector<size_t> prevPreparedWaypointIds(this->points.size());
+    std::vector<size_t> prevFixedIds(this->points.size());
+    for (size_t i = 0; i < this->points.size(); i ++) {
+        const Point & point = this->points[i];
+
+        if (point.fixed) {
+            prevFixedIds[i] = i;
+        } else {
+            prevFixedIds[i] = prevFixedIds[i - 1];
+        }
+
+        if (point.preparedWaypoint) {
+            prevPreparedWaypointIds[i] = i;
+        } else {
+            if (i == 0) {
+                prevPreparedWaypointIds[i] = (size_t)(-1);
+            } else {
+                prevPreparedWaypointIds[i] = prevPreparedWaypointIds[i - 1];
+            }
+        }
+    }
+
+    std::vector<size_t> nextPreparedWaypointIds(this->points.size());
+    std::vector<size_t> nextFixedIds(this->points.size());
+    for (int i = (int)this->points.size() - 1; i >= 0; i --) {
+        const Point & point = this->points[i];
+
+        if (point.fixed) {
+            nextFixedIds[i] = i;
+        } else {
+            nextFixedIds[i] = nextFixedIds[i + 1];
+        }
+
+        if (point.preparedWaypoint) {
+            nextPreparedWaypointIds[i] = i;
+        } else {
+            if (i == (int)this->points.size() - 1) {
+                nextPreparedWaypointIds[i] = (size_t)(-1);
+            } else {
+                nextPreparedWaypointIds[i] = nextPreparedWaypointIds[i + 1];
+            }
+        }
+    }
+
     for (size_t i = 0; i < this->points.size(); i ++) {
         Point & point = this->points[i];
-        bool hasWaypoint = false;
-        if (!point.fixed) {
-            auto intervalPtr = this->intervals.end();
-
-            // can be acclerate begin
-            for (auto it = this->intervals.begin(); it != this->intervals.end(); it ++) {
-                const size_t oId = it->first.first;
-                const size_t dId = it->first.second;
-                if (oId < i && i < dId) {
-                    hasWaypoint = true;
-                    intervalPtr = it;
-                    break;
-                } else if (oId == i || dId == i) {
-                    if (!point.fixed) throw "Line:245";
-                    //point.fixed = true;
-                    break;
-                }
-            }
-            // end
-
-            if (hasWaypoint) {
-                const auto & ids = intervalPtr->second.waypointIds;
-                size_t closestWaypointId = -1;
-                int minIndexDist = std::numeric_limits<int>::max();
-
-                std::vector<size_t> fixedPointIds;
-                fixedPointIds.push_back(intervalPtr->first.first);
-
-                for (size_t id : ids) {
-                    const Waypoint & waypoint = this->waypoints[id];
-                    if (waypoint.closestPointId == (size_t)-1) {
-                        continue;
-                    }
-
-                    fixedPointIds.push_back(waypoint.closestPointId);
-
-                    // distance(index) between this waypoint and point[i]
-                    const int indexDist = std::abs((int)waypoint.closestPointId - (int)i);
-
-                    if (indexDist < minIndexDist) {
-                        minIndexDist = indexDist;
-                        closestWaypointId = id;
-                    }
-                }
-
-                fixedPointIds.push_back(intervalPtr->first.second);
-
-                if (closestWaypointId == (size_t)-1) {
-                    throw "could not find closest waypoint";
-                }
-                point.waypointId = closestWaypointId;
-
-                const auto closestFixedPointPtr = std::find(fixedPointIds.begin(), fixedPointIds.end(), this->waypoints[closestWaypointId].closestPointId);
-                //const auto closestFixedPointPtr = fixedPointIds.find(this->waypoints[closestWaypointId].closestPointId);
-                if (i < *closestFixedPointPtr) {
-                    point.prevFixedPointId = *std::prev(closestFixedPointPtr);
-                    point.nextFixedPointId = *closestFixedPointPtr;
-                } else if (i > *closestFixedPointPtr) {
-                    point.prevFixedPointId = *closestFixedPointPtr;
-                    point.nextFixedPointId = *std::next(closestFixedPointPtr);
-                }
-            } else {
-                //if (!point.isSegment) throw "Line.cpp:293; error";
-
-
-                int l = std::numeric_limits<int>::min();
-                int r = std::numeric_limits<int>::max();
-
-                for (auto it = this->intervals.begin(); it != this->intervals.end(); it ++) {
-                    const size_t oId = it->first.first;
-                    const size_t dId = it->first.second;
-                    if (dId < i) {
-                        l = std::max(l, (int)dId);
-                    }
-                    if (oId > i) {
-                        r = std::min(r, (int)oId);
-                    }
-                }
-
-                if (l == std::numeric_limits<int>::min()) {
-                    l = 0;
-                }
-                if (r == std::numeric_limits<int>::max()) {
-                    r = this->points.size();
-                }
-
-                point.prevFixedPointId = l;
-                point.nextFixedPointId = r;
-            }
-        }
-        if (!hasWaypoint) {
-            if (!point.fixed/* && !point.isSegment*/) {
-                point.fixed = true;
-
-                
-
-            }
-            point.waypointId = -1;
-        }
-    }
-/*
-    size_t left = -1, right = 0;
-    for (size_t i = 0; i < this->points.size(); i ++) {
-        if (this->points[i].waypointId == (unsigned long int)-1) {
-            left = std::min(left, i);
-            right = std::max(right, i);
+        if (point.fixed) {
+            //
+        } else if (point.preparedWaypoint) {
+            Waypoint & waypoint = this->waypoints[point.waypointId];
+            waypoint.closestPointId = i;
         } else {
-            if (left <= right) {
-                //left = fixed, right = fixed
-                const double xCenter = (this->points[left].x + this->points[right].x) / 2.0;
-                const double yCenter = (this->points[left].y + this->points[right].y) / 2.0;
-                Waypoint waypoint(xCenter, yCenter);
-                this->AddWaypoint(this->points[left], this->points[right], waypoint);
-                const size_t waypointId = this->waypoints.size() - 1;
-                for (size_t j = left; j < right; j ++) {
-                    this->points[j].waypointId = waypointId;
+            if (prevPreparedWaypointIds[i] != (size_t)-1 && nextPreparedWaypointIds[i] != (size_t)-1) {
+                size_t preparedWaypointId;
+                if (i - prevPreparedWaypointIds[i] < nextPreparedWaypointIds[i] - i) {
+                    preparedWaypointId = prevPreparedWaypointIds[i];
+                } else {
+                    preparedWaypointId = nextPreparedWaypointIds[i];
                 }
+                const Point & preparedWaypoint = this->points[preparedWaypointId];
+                point.waypointId = preparedWaypoint.waypointId;
+                point.prevFixedPointId = std::max(prevPreparedWaypointIds[i], prevFixedIds[i]);
+                point.nextFixedPointId = std::min(nextPreparedWaypointIds[i], nextFixedIds[i]);
+            } else if (prevPreparedWaypointIds[i] != (size_t)-1) {
+                size_t preparedWaypointId = prevPreparedWaypointIds[i];
+                const Point & preparedWaypoint = this->points[preparedWaypointId];
+
+                point.waypointId = preparedWaypoint.waypointId;
+                point.prevFixedPointId = std::max(prevPreparedWaypointIds[i], prevFixedIds[i]);
+                point.nextFixedPointId = nextFixedIds[i];
+            } else if (nextPreparedWaypointIds[i] != (size_t)-1) {
+                size_t preparedWaypointId = nextPreparedWaypointIds[i];
+                const Point & preparedWaypoint = this->points[preparedWaypointId];
+
+                point.waypointId = preparedWaypoint.waypointId;
+                point.prevFixedPointId = prevFixedIds[i];
+                point.nextFixedPointId = std::min(nextPreparedWaypointIds[i], nextFixedIds[i]);
+            } else {
+                throw "no appropriate waypoint";
             }
         }
     }
-*/
-//
 }
 
 
@@ -419,13 +410,19 @@ void Line::RemovePointsInSegment()
     for (const auto & pii : this->segments) {
         size_t oId = this->FindPointIndexById(pii.first);
         size_t dId = this->FindPointIndexById(pii.second);
+        if (oId >= this->points.size() || dId >= this->points.size() ||
+            oId == (size_t)-1 || dId == (size_t)-1) {
+          continue;
+        }
         if (oId > dId) {
             std::swap(oId, dId);
         }
         this->points[oId].isSegment = true;
         this->points[dId].isSegment = true;
-        for (size_t i = oId + 1; i <= dId - 1; i ++) {
-            keep[i] = false;
+        if (oId < dId) {
+          for (size_t i = oId + 1; i <= dId - 1; i ++) {
+              keep[i] = false;
+          }
         }
     }
 
@@ -438,4 +435,151 @@ void Line::RemovePointsInSegment()
     this->points = newPoints;
 }
 
+
+void Line::PrintFixedPoints() {
+    if (!this->points.empty()) {
+        for (const auto &point: this->points) {
+            if (point.id != -1) {
+                printf("%d ", point.id);
+            }
+        }
+        printf("\n");
+    }
+}
+
+
+// void Line::SetWaypointToFixed()
+// {
+//     for (Point &point: this->points) {
+//         if (point.preparedWaypoint) {
+//             if (point.waypointId == (size_t)-1) {
+//                 throw "waypoint id = -1";
+//             }
+//             const Waypoint &waypoint = this->waypoints[point.waypointId];
+//             point.id = waypoint.id;
+//             point.fixed = true;
+//             point.preparedWaypoint = false;
+//         }
+//     }
+// }
+
+
+
+void Line::AddPointsForWaypoint(const std::vector<Waypoint> & waypoints)
+{
+    if (this->GetPointSize() < 2) {
+        return;
+    }
+
+    std::map<size_t, size_t> indices;
+    std::map<size_t, size_t> addCountLeft;
+    std::map<size_t, size_t> addCountRight;
+
+    for (size_t i = 0; i < this->points.size(); i ++) {
+        const Point &point = this->points[i];
+        if (point.id != (size_t)-1) {
+            if (indices.find(point.id) == indices.end()) {
+                indices[point.id] = i;
+            }
+        }
+    }
+
+    for (const Waypoint & waypoint: waypoints) {
+        size_t oId = waypoint.oId;
+        size_t dId = waypoint.dId;
+        if (indices[oId] < indices[dId]) {
+            addCountLeft[dId] += 2;
+            addCountRight[oId] += 2;
+        } else {
+            addCountLeft[oId] += 2;
+            addCountRight[dId] += 2;
+        }
+    }
+
+    std::vector<Point> newPoints;
+    for (size_t j = 0; j < this->GetPointSize(); j ++) {
+        const Point & point = this->GetPoint(j);
+
+        if (j != 0) {
+            if (point.id != (size_t)-1) {
+                const auto iter = addCountLeft.find(point.id);
+                if (iter != addCountLeft.end()) {
+                    const size_t count = iter->second;
+                    for (size_t k = 0; k < count; k ++) {
+                        Point newPoint(point.x, point.y, 0);
+                        newPoints.push_back(newPoint);
+                    }
+                }
+            }
+        }
+
+        if (!(point.id != (size_t)-1 && indices[point.id] != j)) {
+            newPoints.push_back(point);
+        }
+
+        if (j != this->GetPointSize() - 1) {
+            if (point.id != (size_t)-1) {
+                const auto iter = addCountRight.find(point.id);
+                if (iter != addCountRight.end()) {
+                    const size_t count = iter->second;
+                    for (size_t k = 0; k < count; k ++) {
+                        Point newPoint(point.x, point.y, 0);
+                        newPoints.push_back(newPoint);
+                    }
+                }
+            }
+        }
+    }
+
+    this->points = newPoints;
+
+
+    // if (this->GetPointSize() < 2) {
+    //     return;
+    // }
+
+    // std::map<size_t, size_t> addCount;
+
+    // for (const Waypoint & waypoint: waypoints) {
+    //     size_t oId = waypoint.oId;
+    //     size_t dId = waypoint.dId;
+    //     addCount[oId] += 2;
+    //     addCount[dId] += 2;
+    // }
+
+    // std::vector<Point> newPoints;
+    // for (size_t j = 0; j < this->GetPointSize(); j ++) {
+    //     const Point & point = this->GetPoint(j);
+
+    //     if (j != 0) {
+    //         if (point.id != (size_t)-1 && !(this->points[j - 1].isSegment && point.isSegment)) {
+    //             const auto iter = addCount.find(point.id);
+    //             if (iter != addCount.end()) {
+    //                 const size_t count = iter->second;
+    //                 for (size_t k = 0; k < count; k ++) {
+    //                     Point newPoint(point.x, point.y, 0);
+    //                     newPoints.push_back(newPoint);
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     newPoints.push_back(point);
+
+    //     if (j != this->GetPointSize() - 1) {
+    //         if (point.id != (size_t)-1 && (this->points[j + 1].isSegment && point.isSegment)) {
+    //             const auto iter = addCount.find(point.id);
+    //             if (iter != addCount.end()) {
+    //                 const size_t count = iter->second;
+    //                 for (size_t k = 0; k < count; k ++) {
+    //                     Point newPoint(point.x, point.y, 0);
+    //                     newPoints.push_back(newPoint);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // this->points = newPoints;
+}
 

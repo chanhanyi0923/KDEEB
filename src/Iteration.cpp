@@ -7,14 +7,16 @@ Iteration::Iteration(
 	float kernelSize,
 	double attractionFactor,
 	double smoothingFactor,
-	bool doResampling
+	bool doResampling,
+	int resampleStep
 ):
 	count(count),
 	textureWidth(textureWidth),
 	kernelSize(kernelSize),
 	attractionFactor(attractionFactor),
 	smoothingFactor(smoothingFactor),
-	doResampling(doResampling)
+	doResampling(doResampling),
+	resampleStep(resampleStep)
 {
 }
 

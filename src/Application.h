@@ -24,38 +24,43 @@ private:
     const char * inputPath;// = "/home/hanyi/KDEEB/others/test7/9/";
 
     //const double obstacleRadius = 0.0;
-	const float pointSplitDistant = 0.0006f;
-	const float pointRemoveDistance = 0.0006f;
-	std::vector<Iteration> iterationsForNonRealTime;
-	std::vector<Iteration> iterationsForRealTime;
+    const float pointSplitDistant = 0.005f;
+    const float pointRemoveDistance = 0.005f;
+    std::vector<Iteration> iterationsForNonRealTime;
+    std::vector<Iteration> iterationsForRealTime;
 
     EGLDisplay eglDpy;
-	// std::vector<Frame> frames;
-	DataSet dataSet;
-	Gradient gradient;
+    // std::vector<Frame> frames;
+    DataSet dataSet;
+    Gradient gradient;
     Shader shader;
+    double LngRecord;
+    double LatRecord;
 
     // for morphing
     std::vector<Point> refPoints;
 
-	void Input(const char * inputFile);
-	void Input();
-	void Output(const char * outputFile);
-	//void Output();
+    void Input(const char * inputFile);
+    //void Input();
+    int Input(int layerNum, double maxLng, double minLng, double maxLat, double minLat);
 
-	void TerminateOpenGL();
-	void InitOpenGL();
-	void Config();
+    void Output(const char * outputFile);
+
+    void TerminateOpenGL();
+    void InitOpenGL();
+    void Config();
     void NonRealTimeBundleWithWaypoint();
     void NonRealTimeBundle();
     void RealTimeBundle();
     void InitBundle();
-	void Bundle(const Iteration & iteration);
-    void BundleWithWaypoint(const Iteration & iteration);
+    void Bundle(const Iteration & iteration);
+    void BundleWithWaypoint(const Iteration & iteration, int layerNum);
 
 public:
-	Application();
-	~Application();
-	void Run(const char * inputFile, const char * outputFile);
+    Application();
+    ~Application();
+    int Run(int layerNum, double maxLng, double minLng, double maxLat, double minLat);
 };
+
+
 

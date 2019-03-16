@@ -24,6 +24,9 @@ public:
     // if the point is fixed
     bool fixed;
 
+    // 
+    bool preparedWaypoint;
+
     // id of the waypoint of this point
     size_t waypointId;
 
